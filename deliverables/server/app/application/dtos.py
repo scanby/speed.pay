@@ -109,10 +109,10 @@ class ServerConfigOut(BaseModel):
 
 
 class UpdateConfigIn(BaseModel):
-    tts_enabled: bool
-    tts_voice: str = Field(min_length=3, max_length=64)
+    tts_enabled: Optional[bool] = None
+    tts_voice: Optional[str] = Field(default=None, min_length=3, max_length=64)
     server_port: Optional[int] = Field(default=None, ge=1024, le=65535)
-    github_repo: Optional[str] = Field(default=None, min_length=3, max_length=160)
+    github_repo: Optional[str] = Field(default=None, min_length=3, max_length=200)
     auto_update_enabled: Optional[bool] = None
 
 

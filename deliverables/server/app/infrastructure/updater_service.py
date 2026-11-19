@@ -62,14 +62,22 @@ class UnattendedUpdaterService:
 
     async def check_for_updates(self, github_repo: str) -> ReleaseCheckResult:
         current_ver = get_installed_version()
-        repo = github_repo.strip().strip("/")
-        if not repo or "/" not in repo:
+        repo = (
+            github_repo.strip()
+            .replace("https://github.com/", "")
+            .replace("http://github.com/", "")
+            .strip("/")
+        )
+        if repo.endswith(".git"):
+            repo = repo[:-4]
+
+        if not repo or "/" not in repo or repo.lower().startswith("tu-usuario/"):
             return ReleaseCheckResult(
                 status="error",
                 current_version=current_ver,
                 latest_version=current_ver,
                 update_available=False,
-                message="Repositorio GitHub no configurado (formato esperado: usuario/repositorio).",
+                message="Configura tu repositorio real de GitHub arriba (ej. scanby/tu-repositorio) y pulsa Guardar Repositorio.",
                 release_notes="",
                 server_download_url=None,
                 client_download_url=None,
@@ -83,6 +91,21 @@ class UnattendedUpdaterService:
                     api_url,
                     headers={"Accept": "application/vnd.github+json", "User-Agent": "NequiPayPOS-Updater"},
                 )
+                if resp.status_code == 404:
+                    return ReleaseCheckResult(
+                        status="error",
+                        current_version=current_ver,
+                        latest_version=current_ver,
+                        update_available=False,
+                        message=(
+                            f"No se encontró un Release publicado en '{repo}' (HTTP 404). "
+                            "Verifica que el nombre usuario/repositorio sea correcto, que sea público y tenga al menos un Release publicado."
+                        ),
+                        release_notes="",
+                        server_download_url=None,
+                        client_download_url=None,
+                        sha256_sums_url=None,
+                    )
                 resp.raise_for_status()
                 data = resp.json()
         except Exception as exc:

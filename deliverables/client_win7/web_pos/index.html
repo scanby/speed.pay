@@ -165,9 +165,18 @@
 
           <hr style="margin:20px 0;border:none;border-top:1px solid #e2e8f0;" />
           <h2>Actualizaciones Desatendidas</h2>
-          <p class="muted">Versión instalada: <strong id="cfg-version">1.0.0</strong> · Repositorio: <code id="cfg-repo"></code></p>
+          <p class="muted">Versión instalada: <strong id="cfg-version">1.0.0</strong> · Actual: <code id="cfg-repo"></code></p>
+          <div class="field" style="margin-top:10px;">
+            <label for="cfg-repo-input">Repositorio GitHub (usuario/repositorio)</label>
+            <input id="cfg-repo-input" type="text" placeholder="Ej: scanby/nequipay-pos" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;" />
+          </div>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin:8px 0;">
+            <input id="cfg-auto-update" type="checkbox" checked />
+            <span>Actualización automática en segundo plano</span>
+          </label>
           <div id="update-status-box" class="muted" style="margin:10px 0;"></div>
           <div class="btn-row">
+            <button id="btn-save-repo" class="btn btn-outline" type="button">Guardar Repositorio</button>
             <button id="btn-check-updates" class="btn btn-outline" type="button">Comprobar Actualizaciones</button>
             <button id="btn-install-update" class="btn btn-primary hidden" type="button">Actualizar Ahora (Desatendida)</button>
           </div>

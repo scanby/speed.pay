@@ -249,6 +249,8 @@
           el("cfg-token").textContent = cfg.api_token;
           if (el("cfg-version")) el("cfg-version").textContent = cfg.app_version || "1.0.0";
           if (el("cfg-repo")) el("cfg-repo").textContent = cfg.github_repo || "";
+          if (el("cfg-repo-input")) el("cfg-repo-input").value = cfg.github_repo || "";
+          if (el("cfg-auto-update")) el("cfg-auto-update").checked = Boolean(cfg.auto_update_enabled);
           if (el("cfg-tts-voice") && cfg.tts_voice) el("cfg-tts-voice").value = cfg.tts_voice;
           if (el("cfg-tts-enabled")) el("cfg-tts-enabled").checked = Boolean(cfg.tts_enabled);
         }
@@ -429,22 +431,73 @@
     });
   }
 
+  if (el("btn-save-repo")) {
+    el("btn-save-repo").addEventListener("click", function () {
+      var box = el("update-status-box");
+      var repoVal = el("cfg-repo-input") ? el("cfg-repo-input").value.trim() : "";
+      var autoUpd = el("cfg-auto-update") ? el("cfg-auto-update").checked : true;
+      if (!repoVal) {
+        if (box) box.textContent = "Ingresa tu repositorio con formato usuario/repositorio.";
+        return;
+      }
+      if (box) box.textContent = "Guardando repositorio...";
+      apiRequest(
+        "PUT",
+        "/api/admin/config",
+        {
+          github_repo: repoVal,
+          auto_update_enabled: autoUpd
+        },
+        function (status, updated) {
+          if (status === 200 && updated) {
+            if (el("cfg-repo")) el("cfg-repo").textContent = updated.github_repo;
+            if (el("cfg-repo-input")) el("cfg-repo-input").value = updated.github_repo;
+            if (box) box.textContent = "Repositorio guardado (" + updated.github_repo + "). Ahora pulsa Comprobar Actualizaciones.";
+          } else {
+            if (box) box.textContent = "Error al guardar el repositorio.";
+          }
+        }
+      );
+    });
+  }
+
   if (el("btn-check-updates")) {
     el("btn-check-updates").addEventListener("click", function () {
       var box = el("update-status-box");
+      var repoVal = el("cfg-repo-input") ? el("cfg-repo-input").value.trim() : "";
+      var autoUpd = el("cfg-auto-update") ? el("cfg-auto-update").checked : true;
       box.textContent = "Comparando versión instalada contra el repositorio...";
-      apiRequest("GET", "/api/admin/updates/check", null, function (status, data) {
-        if (status === 200 && data) {
-          box.textContent = data.message;
-          if (data.update_available) {
-            el("btn-install-update").classList.remove("hidden");
+
+      var runCheck = function () {
+        apiRequest("GET", "/api/admin/updates/check", null, function (status, data) {
+          if (status === 200 && data) {
+            box.textContent = data.message;
+            if (data.update_available) {
+              el("btn-install-update").classList.remove("hidden");
+            } else {
+              el("btn-install-update").classList.add("hidden");
+            }
           } else {
-            el("btn-install-update").classList.add("hidden");
+            box.textContent = "Error al comprobar actualizaciones.";
           }
-        } else {
-          box.textContent = "Error al comprobar actualizaciones.";
-        }
-      });
+        });
+      };
+
+      if (repoVal && el("cfg-repo") && repoVal !== el("cfg-repo").textContent) {
+        apiRequest(
+          "PUT",
+          "/api/admin/config",
+          { github_repo: repoVal, auto_update_enabled: autoUpd },
+          function (s, upd) {
+            if (s === 200 && upd) {
+              el("cfg-repo").textContent = upd.github_repo;
+            }
+            runCheck();
+          }
+        );
+      } else {
+        runCheck();
+      }
     });
   }
 

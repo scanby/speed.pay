@@ -417,13 +417,18 @@ class AdminUseCases:
 
     def update_server_config(self, payload: UpdateConfigIn, actor: str, client_ip: str) -> ServerConfigOut:
         current = self._config.get_settings()
+        raw_repo = payload.github_repo.strip() if payload.github_repo is not None else current.github_repo
+        raw_repo = raw_repo.replace("https://github.com/", "").replace("http://github.com/", "").strip("/")
+        if raw_repo.endswith(".git"):
+            raw_repo = raw_repo[:-4]
+
         saved = self._config.save_settings(
             ServerSettings(
                 api_token=current.api_token,
                 server_port=payload.server_port if payload.server_port is not None else current.server_port,
-                tts_enabled=payload.tts_enabled,
-                tts_voice=payload.tts_voice.strip(),
-                github_repo=payload.github_repo.strip() if payload.github_repo is not None else current.github_repo,
+                tts_enabled=payload.tts_enabled if payload.tts_enabled is not None else current.tts_enabled,
+                tts_voice=payload.tts_voice.strip() if payload.tts_voice is not None else current.tts_voice,
+                github_repo=raw_repo or current.github_repo,
                 auto_update_enabled=(
                     payload.auto_update_enabled
                     if payload.auto_update_enabled is not None

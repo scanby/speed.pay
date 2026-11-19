@@ -190,18 +190,7 @@ jobs:
           KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           if [ -n "$KEYSTORE_B64" ] && [ -n "$KEYSTORE_PASS" ] && [ -n "$KEY_ALIAS_SECRET" ]; then
-            python3 - <<'PY'
-import base64, os, re
-raw = os.environ["KEYSTORE_B64"]
-cleaned = re.sub(r"-----[A-Z0-9 ]+-----", "", raw)
-cleaned = re.sub(r"\s+", "", cleaned)
-missing_padding = len(cleaned) % 4
-if missing_padding:
-    cleaned += "=" * (4 - missing_padding)
-data = base64.b64decode(cleaned)
-with open("release.keystore", "wb") as f:
-    f.write(data)
-PY
+            python3 -c 'import base64, os, re; c = re.sub(r"\s+", "", re.sub(r"-----[A-Z0-9 ]+-----", "", os.environ["KEYSTORE_B64"])); c += "=" * ((-len(c)) % 4); open("release.keystore", "wb").write(base64.b64decode(c))'
             if [ ! -s release.keystore ]; then
               echo "Error: ANDROID_KEYSTORE_BASE64 decoded to an empty file."
               exit 1
