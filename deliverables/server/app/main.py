@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import os
 import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -15,7 +17,38 @@ from app.infrastructure.config import detect_lan_ip, logger, settings
 from app.infrastructure.database import SessionLocal, init_database
 from app.infrastructure.repositories_impl import SqlAlchemyConfigRepository
 from app.infrastructure.socketio_manager import socket_manager
+from app.infrastructure.updater_service import (
+    UnattendedUpdaterService,
+    get_installed_version,
+)
 from app.presentation.routes import admin_routes, auth_routes, deposit_routes
+
+
+async def _unattended_auto_update_loop() -> None:
+    """Revisa periódicamente cada 6 horas si hay una versión superior y actualiza desatendidamente."""
+    updater = UnattendedUpdaterService()
+    while True:
+        await asyncio.sleep(60)  # Espera inicial tras arranque
+        try:
+            with SessionLocal() as db:
+                cfg = SqlAlchemyConfigRepository(db).get_settings()
+            if cfg.auto_update_enabled and getattr(sys, "frozen", False):
+                check = await updater.check_for_updates(cfg.github_repo)
+                if check.update_available and check.server_download_url:
+                    logger.info(
+                        "Actualización automática desatendida detectada: v%s -> v%s",
+                        check.current_version,
+                        check.latest_version,
+                    )
+                    await updater.download_and_schedule_unattended_install(
+                        check.server_download_url,
+                        check.sha256_sums_url,
+                    )
+                    await asyncio.sleep(1.0)
+                    os._exit(0)
+        except Exception as exc:
+            logger.warning("Fallo en ciclo de auto-actualización: %s", exc)
+        await asyncio.sleep(6 * 3600)
 
 
 @asynccontextmanager
@@ -25,18 +58,21 @@ async def lifespan(_app: FastAPI):
         SqlAlchemyConfigRepository(db).get_settings()
     Path(settings.AUDIO_DIR).mkdir(parents=True, exist_ok=True)
     lan_ip = detect_lan_ip()
+    bg_task = asyncio.create_task(_unattended_auto_update_loop())
     logger.info(
-        "NequiPay POS Central iniciado en http://%s:%s (Modo WAL activo)",
+        "NequiPay POS Central v%s iniciado en http://%s:%s (Modo WAL activo)",
+        get_installed_version(),
         lan_ip,
         settings.SERVER_PORT,
     )
     yield
+    bg_task.cancel()
     logger.info("Deteniendo servidor NequiPay POS...")
 
 
 fastapi_app = FastAPI(
     title=settings.APP_NAME,
-    version="1.0.0",
+    version=get_installed_version(),
     lifespan=lifespan,
 )
 
@@ -69,6 +105,7 @@ if CLIENT_WEB_DIR.exists():
 def health_check() -> dict:
     return {
         "status": "online",
+        "app_version": get_installed_version(),
         "lan_ip": detect_lan_ip(),
         "active_pos_clients": socket_manager.get_active_client_count(),
     }

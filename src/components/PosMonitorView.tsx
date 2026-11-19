@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import QRCode from "qrcode";
 import {
   AlertTriangle,
+  ArrowUpCircle,
   CheckCircle2,
   Download,
   KeyRound,
@@ -159,6 +160,17 @@ export const PosMonitorView: React.FC = () => {
   const [serverPort, setServerPort] = useState(8000);
   const [apiToken, setApiToken] = useState("nqp_8f9a2c4b7e1d603a9c5b2f8e1d4a7c09");
   const [qrDataUrl, setQrDataUrl] = useState("");
+
+  // Actualizaciones Desatendidas (SemVer vs GitHub Releases)
+  const [installedVersion, setInstalledVersion] = useState("1.0.0");
+  const [githubRepo, setGithubRepo] = useState("tu-usuario/nequipos");
+  const [autoUpdateEnabled, setAutoUpdateEnabled] = useState(true);
+  const [updateCheckInfo, setUpdateCheckInfo] = useState<{
+    status: "up_to_date" | "update_available" | "error";
+    latestVersion: string;
+    message: string;
+  } | null>(null);
+  const [unattendedStep, setUnattendedStep] = useState<string | null>(null);
 
   // Filtros Históricos Admin
   const todayStr = new Date().toISOString().slice(0, 10);
@@ -928,6 +940,156 @@ export const PosMonitorView: React.FC = () => {
                   <span>Probar Sonido ($50.000)</span>
                 </button>
               </div>
+            </div>
+
+            {/* Sección Actualizaciones Desatendidas */}
+            <div className="pt-4 border-t border-slate-200 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                  <ArrowUpCircle className="w-4 h-4 text-[#DA0081]" />
+                  <span>Actualizaciones del Sistema (Desatendidas)</span>
+                </h3>
+                <span className="text-xs font-mono text-slate-600 tabular-nums">
+                  Instalada: v{installedVersion}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                    Repositorio GitHub (usuario/repo)
+                  </label>
+                  <input
+                    type="text"
+                    value={githubRepo}
+                    onChange={(e) => setGithubRepo(e.target.value)}
+                    className="w-full px-3 py-1.5 text-xs font-mono border border-slate-300 rounded-md"
+                  />
+                </div>
+                <label className="inline-flex items-center gap-2 text-xs text-slate-700 pb-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={autoUpdateEnabled}
+                    onChange={(e) => setAutoUpdateEnabled(e.target.checked)}
+                    className="rounded border-slate-300 text-[#DA0081]"
+                  />
+                  <span>Actualización automática en segundo plano (cada 6h)</span>
+                </label>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const res = await fetch("/api/pos/updates/check", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ installedVersion, githubRepo }),
+                    });
+                    const data = await res.json();
+                    setUpdateCheckInfo({
+                      status: data.status,
+                      latestVersion: data.latestVersion || installedVersion,
+                      message: data.message,
+                    });
+                    setUnattendedStep(null);
+                  }}
+                  className="px-3 py-1.5 text-xs font-semibold rounded-md border border-slate-300 bg-white text-slate-800 hover:bg-slate-50"
+                >
+                  Consultar GitHub API
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const res = await fetch("/api/pos/updates/check", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        installedVersion,
+                        simulatedRemoteVersion: installedVersion,
+                      }),
+                    });
+                    const data = await res.json();
+                    setUpdateCheckInfo({
+                      status: data.status,
+                      latestVersion: data.latestVersion,
+                      message: data.message,
+                    });
+                    setUnattendedStep(null);
+                  }}
+                  className="px-3 py-1.5 text-xs font-medium rounded-md border border-slate-200 text-slate-700 hover:bg-slate-50"
+                >
+                  Probar Misma Versión (v{installedVersion})
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const nextVer = installedVersion === "1.0.0" ? "1.2.0" : "2.0.0";
+                    const res = await fetch("/api/pos/updates/check", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        installedVersion,
+                        simulatedRemoteVersion: nextVer,
+                      }),
+                    });
+                    const data = await res.json();
+                    setUpdateCheckInfo({
+                      status: data.status,
+                      latestVersion: data.latestVersion,
+                      message: data.message,
+                    });
+                    setUnattendedStep(null);
+                  }}
+                  className="px-3 py-1.5 text-xs font-medium rounded-md border border-slate-200 text-slate-700 hover:bg-slate-50"
+                >
+                  Simular Nueva Release en Repo
+                </button>
+              </div>
+
+              {updateCheckInfo && (
+                <div
+                  className={`p-3 rounded-md border text-xs space-y-2 ${
+                    updateCheckInfo.status === "up_to_date"
+                      ? "bg-emerald-50 border-emerald-200 text-emerald-900"
+                      : updateCheckInfo.status === "update_available"
+                      ? "bg-amber-50 border-amber-200 text-amber-900"
+                      : "bg-red-50 border-red-200 text-red-900"
+                  }`}
+                >
+                  <div className="font-medium">{updateCheckInfo.message}</div>
+                  {updateCheckInfo.status === "update_available" && !unattendedStep && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const target = updateCheckInfo.latestVersion;
+                        setUnattendedStep(`Descargando NequiPayPOS_Server_Win10_11.exe (v${target})...`);
+                        setTimeout(() => {
+                          setUnattendedStep("Verificando firma SHA-256 contra SHA256SUMS.txt...");
+                        }, 700);
+                        setTimeout(() => {
+                          setUnattendedStep("Reemplazando binario vía script .cmd y reiniciando servicio sin intervención...");
+                        }, 1400);
+                        setTimeout(() => {
+                          setInstalledVersion(target);
+                          setUpdateCheckInfo({
+                            status: "up_to_date",
+                            latestVersion: target,
+                            message: `Actualización desatendida completada. Tienes la versión más reciente instalada (v${target}).`,
+                          });
+                          setUnattendedStep(null);
+                        }, 2200);
+                      }}
+                      className="px-3 py-1.5 text-xs font-semibold rounded-md bg-emerald-700 text-white hover:bg-emerald-800"
+                    >
+                      Actualizar Ahora (Desatendida)
+                    </button>
+                  )}
+                  {unattendedStep && (
+                    <div className="font-mono text-[11px] text-slate-800">{unattendedStep}</div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 

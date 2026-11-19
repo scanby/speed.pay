@@ -30,6 +30,11 @@ from client_config import (
     load_client_config,
     save_client_config,
 )
+from client_updater import (
+    apply_unattended_client_update,
+    check_client_update,
+    get_client_version,
+)
 from config_window import open_config_dialog
 
 LOG_DIR = os.path.join(os.path.expanduser("~"), ".nequipos_client", "logs")
@@ -210,6 +215,29 @@ class PosTrayAgent(object):
                     pass
             time.sleep(5)
 
+    def _auto_update_loop(self):
+        time.sleep(45)
+        while self.running:
+            try:
+                if self.config.get("auto_update_enabled", True):
+                    res = check_client_update(self.config.get("github_repo", ""))
+                    if res["status"] == "update_available" and res.get("download_url"):
+                        logger.info(
+                            "Actualización desatendida detectada: v%s -> v%s",
+                            res["current_version"],
+                            res["latest_version"],
+                        )
+                        ok, msg = apply_unattended_client_update(
+                            res["download_url"],
+                            res.get("sha256_sums_url"),
+                        )
+                        logger.info("Resultado actualización desatendida: %s (%s)", ok, msg)
+                        if ok:
+                            os._exit(0)
+            except Exception as exc:
+                logger.warning("Fallo verificando actualización automática: %s", exc)
+            time.sleep(6 * 3600)
+
     def stop(self, _icon=None, _item=None):
         self.running = False
         try:
@@ -222,10 +250,13 @@ class PosTrayAgent(object):
     def run(self):
         worker = threading.Thread(target=self._socket_loop, daemon=True)
         worker.start()
+        updater_worker = threading.Thread(target=self._auto_update_loop, daemon=True)
+        updater_worker.start()
 
+        ver_label = "Configurar Servidor y Actualizaciones (v{0})".format(get_client_version())
         menu = pystray.Menu(
             pystray.MenuItem("Abrir Monitor POS", self.open_pos_kiosk, default=True),
-            pystray.MenuItem("Configurar Servidor (IP / Puerto)", self.open_configuration_panel),
+            pystray.MenuItem(ver_label, self.open_configuration_panel),
             pystray.MenuItem("Salir", self.stop),
         )
         self.tray_icon = pystray.Icon(

@@ -17,6 +17,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Inject Release Version into Server
+        shell: pwsh
+        run: |
+          $ver = if ($env:GITHUB_REF_NAME -match '^v?(\d+\.\d+\.\d+.*)$') { $matches[1] } else { "1.0.0" }
+          Set-Content -Path deliverables/server/VERSION -Value $ver -NoNewline -Encoding UTF8
+
       - name: Setup Python 3.11
         uses: actions/setup-python@v5
         with:
@@ -28,7 +34,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt pyinstaller
 
-      - name: Run unit tests (Dominio e Idempotencia SHA-256)
+      - name: Run unit tests (Dominio, Idempotencia y SemVer)
         working-directory: deliverables/server
         run: pytest -v
 
@@ -44,6 +50,7 @@ jobs:
             --hidden-import="uvicorn.lifespan.on" `
             --hidden-import="engineio.async_drivers.asgi" `
             --hidden-import="pyttsx3.drivers.sapi5" `
+            --add-data "VERSION;." `
             --add-data "..\client_win7\web_pos;client_win7\web_pos" `
             app/main.py
 
@@ -59,6 +66,12 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Inject Release Version into Win7 Client
+        shell: pwsh
+        run: |
+          $ver = if ($env:GITHUB_REF_NAME -match '^v?(\d+\.\d+\.\d+.*)$') { $matches[1] } else { "1.0.0" }
+          Set-Content -Path deliverables/client_win7/VERSION -Value $ver -NoNewline -Encoding UTF8
 
       # Python 3.8.10 x86 + PyInstaller 5.13.2 es la última cadena compatible con Windows 7 SP1 (32 y 64 bits)
       - name: Setup Python 3.8.10 (32-bit x86 for Win7 compatibility)
@@ -81,6 +94,7 @@ jobs:
             --paths "." `
             --hidden-import="tkinter" `
             --hidden-import="engineio.async_drivers.threading" `
+            --add-data "VERSION;." `
             agent_tray.py
 
       - name: Upload Client Win7 EXE artifact

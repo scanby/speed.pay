@@ -292,6 +292,8 @@ class SqlAlchemyConfigRepository(IConfigRepository):
                 server_port=settings.SERVER_PORT,
                 tts_enabled=True,
                 tts_voice=settings.TTS_VOICE,
+                github_repo="tu-usuario/nequipos",
+                auto_update_enabled=True,
                 updated_at=datetime.utcnow(),
             )
             self._db.add(row)
@@ -302,6 +304,8 @@ class SqlAlchemyConfigRepository(IConfigRepository):
             server_port=row.server_port,
             tts_enabled=row.tts_enabled,
             tts_voice=row.tts_voice,
+            github_repo=row.github_repo,
+            auto_update_enabled=row.auto_update_enabled,
             updated_at=row.updated_at,
         )
 
@@ -314,6 +318,8 @@ class SqlAlchemyConfigRepository(IConfigRepository):
         row.server_port = new_settings.server_port
         row.tts_enabled = new_settings.tts_enabled
         row.tts_voice = new_settings.tts_voice
+        row.github_repo = new_settings.github_repo
+        row.auto_update_enabled = new_settings.auto_update_enabled
         row.updated_at = datetime.utcnow()
         self._db.commit()
         self._db.refresh(row)
@@ -322,5 +328,7 @@ class SqlAlchemyConfigRepository(IConfigRepository):
             server_port=row.server_port,
             tts_enabled=row.tts_enabled,
             tts_voice=row.tts_voice,
+            github_repo=row.github_repo,
+            auto_update_enabled=row.auto_update_enabled,
             updated_at=row.updated_at,
         )

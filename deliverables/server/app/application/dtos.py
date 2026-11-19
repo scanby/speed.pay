@@ -96,11 +96,14 @@ class DailyDepositsOut(BaseModel):
 
 
 class ServerConfigOut(BaseModel):
+    app_version: str
     lan_ip: str
     server_port: int
     api_token: str
     tts_enabled: bool
     tts_voice: str
+    github_repo: str
+    auto_update_enabled: bool
     active_pos_clients: int
     updated_at: datetime
 
@@ -109,6 +112,8 @@ class UpdateConfigIn(BaseModel):
     tts_enabled: bool
     tts_voice: str = Field(min_length=3, max_length=64)
     server_port: int = Field(ge=1024, le=65535)
+    github_repo: str = Field(min_length=3, max_length=160)
+    auto_update_enabled: bool = True
 
 
 class QrConfigOut(BaseModel):
@@ -116,3 +121,22 @@ class QrConfigOut(BaseModel):
     qr_image_base64: str
     lan_ip: str
     server_port: int
+
+
+class UpdateCheckOut(BaseModel):
+    status: str
+    current_version: str
+    latest_version: str
+    update_available: bool
+    message: str
+    release_notes: str
+    server_download_url: Optional[str] = None
+    client_download_url: Optional[str] = None
+    sha256_sums_url: Optional[str] = None
+
+
+class UpdateInstallOut(BaseModel):
+    status: str
+    message: str
+    target_version: str
+

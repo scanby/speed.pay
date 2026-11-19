@@ -70,4 +70,6 @@ class ServerSettings:
     server_port: int
     tts_enabled: bool
     tts_voice: str
+    github_repo: str = "tu-usuario/nequipos"
+    auto_update_enabled: bool = True
     updated_at: datetime = field(default_factory=datetime.utcnow)

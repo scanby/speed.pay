@@ -11,7 +11,9 @@ from app.application.dtos import (
     NequiAccountOut,
     QrConfigOut,
     ServerConfigOut,
+    UpdateCheckOut,
     UpdateConfigIn,
+    UpdateInstallOut,
     UserOut,
 )
 from app.application.use_cases import AdminUseCases
@@ -125,3 +127,26 @@ async def trigger_test_sound(
     use_cases: AdminUseCases = Depends(get_admin_use_cases),
 ) -> dict:
     return await use_cases.test_sound(amount)
+
+
+@router.get("/updates/check", response_model=UpdateCheckOut)
+async def check_for_updates(
+    _admin: User = Depends(require_admin),
+    use_cases: AdminUseCases = Depends(get_admin_use_cases),
+) -> UpdateCheckOut:
+    return await use_cases.check_updates()
+
+
+@router.post("/updates/install", response_model=UpdateInstallOut, status_code=status.HTTP_202_ACCEPTED)
+async def install_unattended_update(
+    request: Request,
+    admin: User = Depends(require_admin),
+    use_cases: AdminUseCases = Depends(get_admin_use_cases),
+) -> UpdateInstallOut:
+    client_ip = request.client.host if request.client else "unknown"
+    try:
+        return await use_cases.install_unattended_update(admin.username, client_ip)
+    except ResourceNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))

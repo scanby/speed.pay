@@ -166,6 +166,8 @@
         el("cfg-ip").textContent = cfg.lan_ip;
         el("cfg-port").textContent = String(cfg.server_port);
         el("cfg-token").textContent = cfg.api_token;
+        if (el("cfg-version")) el("cfg-version").textContent = cfg.app_version || "1.0.0";
+        if (el("cfg-repo")) el("cfg-repo").textContent = cfg.github_repo || "";
       }
     });
     apiRequest("GET", "/api/admin/config/qr", null, function (status, qr) {
@@ -304,6 +306,36 @@
   el("btn-test-sound").addEventListener("click", function () {
     apiRequest("POST", "/api/admin/test-sound?amount=50000", {}, function () {});
   });
+
+  if (el("btn-check-updates")) {
+    el("btn-check-updates").addEventListener("click", function () {
+      var box = el("update-status-box");
+      box.textContent = "Comparando versión instalada contra el repositorio...";
+      apiRequest("GET", "/api/admin/updates/check", null, function (status, data) {
+        if (status === 200 && data) {
+          box.textContent = data.message;
+          if (data.update_available) {
+            el("btn-install-update").classList.remove("hidden");
+          } else {
+            el("btn-install-update").classList.add("hidden");
+          }
+        } else {
+          box.textContent = "Error al comprobar actualizaciones.";
+        }
+      });
+    });
+  }
+
+  if (el("btn-install-update")) {
+    el("btn-install-update").addEventListener("click", function () {
+      var box = el("update-status-box");
+      el("btn-install-update").disabled = true;
+      box.textContent = "Descargando y aplicando actualización desatendida...";
+      apiRequest("POST", "/api/admin/updates/install", {}, function (status, data) {
+        box.textContent = (data && data.message) || "Actualización programada. Reiniciando servidor...";
+      });
+    });
+  }
 
   el("btn-search-history").addEventListener("click", function () {
     var s = el("filter-start").value;

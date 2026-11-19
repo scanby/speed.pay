@@ -1,9 +1,9 @@
-from __future__ import annotations
-
+import asyncio
 import base64
 import csv
 import io
 import json
+import os
 from datetime import date, datetime
 from decimal import Decimal
 from typing import List, Optional
@@ -22,7 +22,9 @@ from app.application.dtos import (
     QrConfigOut,
     ServerConfigOut,
     SetupAdminIn,
+    UpdateCheckOut,
     UpdateConfigIn,
+    UpdateInstallOut,
     UserOut,
 )
 from app.domain.entities import (
@@ -61,6 +63,10 @@ from app.infrastructure.security import (
     verify_password,
 )
 from app.infrastructure.socketio_manager import SocketIOManager
+from app.infrastructure.updater_service import (
+    UnattendedUpdaterService,
+    get_installed_version,
+)
 
 
 def _to_user_out(user: User) -> UserOut:
@@ -393,11 +399,14 @@ class AdminUseCases:
     def get_server_config(self) -> ServerConfigOut:
         cfg = self._config.get_settings()
         return ServerConfigOut(
+            app_version=get_installed_version(),
             lan_ip=detect_lan_ip(),
             server_port=cfg.server_port,
             api_token=cfg.api_token,
             tts_enabled=cfg.tts_enabled,
             tts_voice=cfg.tts_voice,
+            github_repo=cfg.github_repo,
+            auto_update_enabled=cfg.auto_update_enabled,
             active_pos_clients=self._ws.get_active_client_count(),
             updated_at=cfg.updated_at,
         )
@@ -410,6 +419,8 @@ class AdminUseCases:
                 server_port=payload.server_port,
                 tts_enabled=payload.tts_enabled,
                 tts_voice=payload.tts_voice,
+                github_repo=payload.github_repo.strip(),
+                auto_update_enabled=payload.auto_update_enabled,
             )
         )
         self._audit.record(
@@ -417,7 +428,7 @@ class AdminUseCases:
                 id=None,
                 actor_username=actor,
                 action="UPDATE_CONFIG",
-                details=f"Port={saved.server_port}, TTS={saved.tts_enabled}",
+                details=f"Port={saved.server_port}, TTS={saved.tts_enabled}, Repo={saved.github_repo}",
                 ip_address=client_ip,
             )
         )
@@ -431,6 +442,8 @@ class AdminUseCases:
                 server_port=current.server_port,
                 tts_enabled=current.tts_enabled,
                 tts_voice=current.tts_voice,
+                github_repo=current.github_repo,
+                auto_update_enabled=current.auto_update_enabled,
             )
         )
         self._audit.record(
@@ -443,6 +456,62 @@ class AdminUseCases:
             )
         )
         return self.get_server_config()
+
+    async def check_updates(self) -> UpdateCheckOut:
+        cfg = self._config.get_settings()
+        updater = UnattendedUpdaterService()
+        res = await updater.check_for_updates(cfg.github_repo)
+        return UpdateCheckOut(
+            status=res.status,
+            current_version=res.current_version,
+            latest_version=res.latest_version,
+            update_available=res.update_available,
+            message=res.message,
+            release_notes=res.release_notes,
+            server_download_url=res.server_download_url,
+            client_download_url=res.client_download_url,
+            sha256_sums_url=res.sha256_sums_url,
+        )
+
+    async def install_unattended_update(self, actor: str, client_ip: str) -> UpdateInstallOut:
+        cfg = self._config.get_settings()
+        updater = UnattendedUpdaterService()
+        check = await updater.check_for_updates(cfg.github_repo)
+        if not check.update_available:
+            return UpdateInstallOut(
+                status="up_to_date",
+                message=check.message,
+                target_version=check.current_version,
+            )
+        if not check.server_download_url:
+            raise ResourceNotFoundError(
+                "El release no contiene el ejecutable NequiPayPOS_Server_Win10_11.exe."
+            )
+
+        await updater.download_and_schedule_unattended_install(
+            download_url=check.server_download_url,
+            sha256_sums_url=check.sha256_sums_url,
+        )
+        self._audit.record(
+            AuditLog(
+                id=None,
+                actor_username=actor,
+                action="UNATTENDED_UPDATE",
+                details=f"Actualización desatendida v{check.current_version} -> v{check.latest_version}",
+                ip_address=client_ip,
+            )
+        )
+
+        async def _exit_after_response() -> None:
+            await asyncio.sleep(1.2)
+            os._exit(0)
+
+        asyncio.create_task(_exit_after_response())
+        return UpdateInstallOut(
+            status="installing",
+            message=f"Actualizando desatendidamente a v{check.latest_version}. El servidor se reiniciará en segundos.",
+            target_version=check.latest_version,
+        )
 
     def generate_qr_config(self) -> QrConfigOut:
         cfg = self._config.get_settings()

@@ -111,6 +111,86 @@ async function startServer() {
     });
   });
 
+  // API: Comparación de versión instalada vs repositorio GitHub Releases
+  app.post("/api/pos/updates/check", async (req, res) => {
+    const { installedVersion = "1.0.0", githubRepo = "", simulatedRemoteVersion } = req.body ?? {};
+    const parseVer = (v: string): [number, number, number] => {
+      const m = String(v).trim().replace(/^v/i, "").match(/^(\d+)\.(\d+)\.(\d+)/);
+      return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : [0, 0, 0];
+    };
+    const isGreater = (a: string, b: string) => {
+      const pa = parseVer(a);
+      const pb = parseVer(b);
+      for (let i = 0; i < 3; i++) {
+        if (pa[i] !== pb[i]) return pa[i] > pb[i];
+      }
+      return false;
+    };
+
+    if (simulatedRemoteVersion) {
+      const cleanInstalled = String(installedVersion).replace(/^v/i, "");
+      const cleanRemote = String(simulatedRemoteVersion).replace(/^v/i, "");
+      const updateAvailable = isGreater(cleanRemote, cleanInstalled);
+      return res.json({
+        status: updateAvailable ? "update_available" : "up_to_date",
+        currentVersion: cleanInstalled,
+        latestVersion: cleanRemote,
+        updateAvailable,
+        message: updateAvailable
+          ? `Nueva versión v${cleanRemote} disponible en el repositorio (tienes v${cleanInstalled}). Se sugiere actualización desatendida.`
+          : `Tienes la versión más reciente instalada (v${cleanInstalled}).`,
+      });
+    }
+
+    const repo = String(githubRepo).trim().replace(/^\/|\/$/g, "");
+    if (!repo || !repo.includes("/")) {
+      return res.status(400).json({
+        status: "error",
+        message: "Ingresa un repositorio válido con formato usuario/repositorio.",
+      });
+    }
+
+    try {
+      const ghRes = await fetch(`https://api.github.com/repos/${repo}/releases/latest`, {
+        headers: {
+          Accept: "application/vnd.github+json",
+          "User-Agent": "NequiPayPOS-Console",
+        },
+      });
+      if (!ghRes.ok) {
+        return res.json({
+          status: "error",
+          currentVersion: installedVersion,
+          latestVersion: installedVersion,
+          updateAvailable: false,
+          message: `GitHub API respondió HTTP ${ghRes.status} para ${repo}.`,
+        });
+      }
+      const data = (await ghRes.json()) as { tag_name?: string; body?: string };
+      const remoteVer = String(data.tag_name || installedVersion).replace(/^v/i, "");
+      const cleanInstalled = String(installedVersion).replace(/^v/i, "");
+      const updateAvailable = isGreater(remoteVer, cleanInstalled);
+      return res.json({
+        status: updateAvailable ? "update_available" : "up_to_date",
+        currentVersion: cleanInstalled,
+        latestVersion: remoteVer,
+        updateAvailable,
+        releaseNotes: data.body || "",
+        message: updateAvailable
+          ? `Nueva versión v${remoteVer} disponible en el repositorio (tienes v${cleanInstalled}). Se sugiere actualización desatendida.`
+          : `Tienes la versión más reciente instalada (v${cleanInstalled}).`,
+      });
+    } catch (err) {
+      return res.json({
+        status: "error",
+        currentVersion: installedVersion,
+        latestVersion: installedVersion,
+        updateAvailable: false,
+        message: `Error consultando GitHub: ${err instanceof Error ? err.message : "red"}`,
+      });
+    }
+  });
+
   const isProd = process.env.NODE_ENV === "production";
   if (!isProd) {
     const vite = await createViteServer({

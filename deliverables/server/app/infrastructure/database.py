@@ -123,11 +123,24 @@ class SystemConfigModel(Base):
     server_port = Column(Integer, nullable=False, default=8000)
     tts_enabled = Column(Boolean, nullable=False, default=True)
     tts_voice = Column(String(64), nullable=False, default="es-CO-SalomeNeural")
+    github_repo = Column(String(160), nullable=False, default="tu-usuario/nequipos")
+    auto_update_enabled = Column(Boolean, nullable=False, default=True)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
 
 def init_database() -> None:
     Base.metadata.create_all(bind=engine)
+    # Migración ligera para bases existentes sin perder datos
+    with engine.begin() as conn:
+        cols = [row[1] for row in conn.exec_driver_sql("PRAGMA table_info(system_config);").fetchall()]
+        if "github_repo" not in cols:
+            conn.exec_driver_sql(
+                "ALTER TABLE system_config ADD COLUMN github_repo VARCHAR(160) NOT NULL DEFAULT 'tu-usuario/nequipos';"
+            )
+        if "auto_update_enabled" not in cols:
+            conn.exec_driver_sql(
+                "ALTER TABLE system_config ADD COLUMN auto_update_enabled BOOLEAN NOT NULL DEFAULT 1;"
+            )
     logger.info("Base de datos SQLite inicializada en modo WAL.")
 
 

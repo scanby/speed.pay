@@ -62,9 +62,11 @@ export const DeploymentGuideView: React.FC = () => {
   const [clientIp, setClientIp] = useState("192.168.1.50");
   const [clientPort, setClientPort] = useState(8000);
   const [posLabel, setPosLabel] = useState("Caja Principal");
+  const [githubRepo, setGithubRepo] = useState("tu-usuario/nequipos");
   const [audioVolume, setAudioVolume] = useState(100);
   const [kioskMode, setKioskMode] = useState(true);
   const [autoOpen, setAutoOpen] = useState(true);
+  const [autoUpdate, setAutoUpdate] = useState(true);
   const [testResult, setTestResult] = useState<{ ok: boolean; text: string } | null>(null);
 
   async function copyCommand(id: string, text: string) {
@@ -96,9 +98,11 @@ export const DeploymentGuideView: React.FC = () => {
       server_ip: clientIp,
       server_port: clientPort,
       pos_label: posLabel,
+      github_repo: githubRepo,
       audio_volume: audioVolume,
       kiosk_mode: kioskMode,
       auto_open_browser: autoOpen,
+      auto_update_enabled: autoUpdate,
     },
     null,
     2
@@ -189,6 +193,17 @@ export const DeploymentGuideView: React.FC = () => {
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1">
+                Repositorio GitHub (OTA)
+              </label>
+              <input
+                type="text"
+                value={githubRepo}
+                onChange={(e) => setGithubRepo(e.target.value)}
+                className="w-full px-3 py-1.5 text-xs font-mono border border-slate-300 rounded-md"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1">
                 Volumen de Voz ({audioVolume}%)
               </label>
               <input
@@ -221,17 +236,46 @@ export const DeploymentGuideView: React.FC = () => {
               />
               <span>Abrir monitor al iniciar Windows</span>
             </label>
+            <label className="inline-flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={autoUpdate}
+                onChange={(e) => setAutoUpdate(e.target.checked)}
+                className="rounded border-slate-300 text-[#DA0081]"
+              />
+              <span>Actualizaciones desatendidas</span>
+            </label>
           </div>
 
-          <div className="flex items-center justify-between gap-3">
-            <button
-              type="button"
-              onClick={handleTestClientConnection}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md border border-slate-300 hover:bg-slate-50"
-            >
-              <Wifi className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Probar Conexión</span>
-            </button>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleTestClientConnection}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md border border-slate-300 hover:bg-slate-50"
+              >
+                <Wifi className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Probar Conexión</span>
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const res = await fetch("/api/pos/updates/check", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      installedVersion: "1.0.0",
+                      simulatedRemoteVersion: "1.0.0",
+                    }),
+                  });
+                  const data = await res.json();
+                  setTestResult({ ok: true, text: data.message });
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md border border-slate-300 hover:bg-slate-50"
+              >
+                <span>Buscar Actualizaciones</span>
+              </button>
+            </div>
             <span className="text-[11px] font-mono text-slate-500 truncate">
               ~/.nequipos_client/config.json
             </span>

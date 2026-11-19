@@ -18,6 +18,8 @@ DEFAULT_CONFIG = {
     "auto_open_browser": True,
     "audio_volume": 100,
     "pos_label": "Caja 1",
+    "github_repo": "tu-usuario/nequipos",
+    "auto_update_enabled": True,
 }
 
 
@@ -48,6 +50,8 @@ def save_client_config(cfg):
         "auto_open_browser": bool(cfg.get("auto_open_browser", True)),
         "audio_volume": max(0, min(100, int(cfg.get("audio_volume", 100)))),
         "pos_label": str(cfg.get("pos_label", "Caja 1")).strip() or "Caja 1",
+        "github_repo": str(cfg.get("github_repo", "tu-usuario/nequipos")).strip() or "tu-usuario/nequipos",
+        "auto_update_enabled": bool(cfg.get("auto_update_enabled", True)),
     }
     with open(CONFIG_PATH, "w", encoding="utf-8") as f:
         json.dump(clean, f, indent=2, ensure_ascii=False)

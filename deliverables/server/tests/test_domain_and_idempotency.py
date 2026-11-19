@@ -2,6 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 
 from app.domain.services import build_tts_phrase, compute_idempotency_hash, monto_a_letras
+from app.infrastructure.updater_service import parse_semver
 
 
 def test_monto_a_letras_valores_colombia() -> None:
@@ -15,8 +16,8 @@ def test_monto_a_letras_valores_colombia() -> None:
 
 def test_idempotency_hash_deterministico_por_ventana() -> None:
     t1 = datetime(2026, 5, 10, 14, 20, 10)
-    t2 = datetime(2026, 5, 10, 14, 21, 50)  # Misma ventana de 120s (bucket exacto)
-    t3 = datetime(2026, 5, 10, 14, 25, 0)   # Ventana diferente
+    t2 = datetime(2026, 5, 10, 14, 21, 50)
+    t3 = datetime(2026, 5, 10, 14, 25, 0)
 
     h1 = compute_idempotency_hash(1, "Carlos  Mendoza ", Decimal("45000.00"), t1, 120)
     h2 = compute_idempotency_hash(1, "carlos mendoza", Decimal("45000"), t2, 120)
@@ -25,3 +26,9 @@ def test_idempotency_hash_deterministico_por_ventana() -> None:
     assert len(h1) == 64
     assert h1 == h2
     assert h1 != h3
+
+
+def test_semver_version_comparison() -> None:
+    assert parse_semver("v1.2.0") > parse_semver("1.0.0")
+    assert parse_semver("1.0.10") > parse_semver("1.0.2")
+    assert parse_semver("v1.0.0") == parse_semver("1.0.0")
