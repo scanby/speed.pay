@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">NequiPay POS Agente</string>
+    <string name="notification_channel_name">Servicio Activo NequiPay POS</string>
+    <string name="notification_channel_desc">Mantiene la captura continua de pagos Nequi en segundo plano.</string>
+</resources>

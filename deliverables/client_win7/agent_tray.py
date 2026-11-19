@@ -2,13 +2,14 @@
 """
 Agente Nativo POS para Windows 7 / 10 / 11 (Python 3.8 compatible).
 - Incluye Panel de Configuración local (Tkinter) para definir la IP estática del PC Servidor,
-  puerto, nombre de caja y volumen sin recompilar ni editar accesos directos.
+  puerto, nombre de caja, volumen y actualizaciones desatendidas sin recompilar.
 - Mantiene conexión Socket.IO persistente en segundo plano con reconexión exponencial.
-- Descarga el audio WAV/MP3 generado por el servidor y lo reproduce con pygame.mixer,
-  evitando cualquier bloqueo de autoplay del navegador en cajas registradoras.
+- Reproduce el audio MP3/WAV generado por el servidor usando winmm.dll nativo de Windows
+  (sin dependencias C externas como pygame/SDL2 y evitando bloqueo de autoplay del navegador).
 - Muestra icono en bandeja del sistema (Verde: Conectado / Rojo: Desconectado).
 """
 import argparse
+import ctypes
 import logging
 import os
 import subprocess
@@ -18,7 +19,6 @@ import time
 import webbrowser
 from logging.handlers import RotatingFileHandler
 
-import pygame
 import pystray
 import requests
 import socketio
@@ -59,6 +59,23 @@ def create_status_icon(color_hex):
     return image
 
 
+def play_windows_audio_blocking(file_path, volume_percent=100):
+    """Reproduce archivos MP3 o WAV nativamente en Windows 7/10/11 usando winmm.dll (MCI)."""
+    if os.name != "nt":
+        return
+    winmm = ctypes.windll.winmm
+    alias = "nequipos_tts_{0}".format(int(time.time() * 1000))
+    mci_send = winmm.mciSendStringW
+    mci_send('open "{0}" type mpegvideo alias {1}'.format(file_path, alias), None, 0, 0)
+    try:
+        # Volumen MCI en rango 0..1000
+        mci_vol = max(0, min(1000, int(volume_percent) * 10))
+        mci_send("setaudio {0} volume to {1}".format(alias, mci_vol), None, 0, 0)
+        mci_send("play {0} wait".format(alias), None, 0, 0)
+    finally:
+        mci_send("close {0}".format(alias), None, 0, 0)
+
+
 class PosTrayAgent(object):
     def __init__(self, initial_config):
         self.config = initial_config
@@ -68,8 +85,6 @@ class PosTrayAgent(object):
         self.reconnect_requested = False
         self.audio_lock = threading.Lock()
         self.tray_icon = None
-
-        pygame.mixer.init(frequency=44100, size=-16, channels=2, buffer=2048)
 
         self.sio = socketio.Client(
             reconnection=True,
@@ -127,13 +142,8 @@ class PosTrayAgent(object):
                 with os.fdopen(fd, "wb") as f:
                     f.write(resp.content)
 
-                volume = max(0.0, min(1.0, float(self.config.get("audio_volume", 100)) / 100.0))
-                pygame.mixer.music.load(tmp_path)
-                pygame.mixer.music.set_volume(volume)
-                pygame.mixer.music.play()
-                while pygame.mixer.music.get_busy():
-                    time.sleep(0.1)
-                pygame.mixer.music.unload()
+                vol = int(self.config.get("audio_volume", 100))
+                play_windows_audio_blocking(tmp_path, volume_percent=vol)
             except Exception as exc:
                 logger.error("Error reproduciendo audio TTS %s: %s", full_audio_url, exc)
             finally:

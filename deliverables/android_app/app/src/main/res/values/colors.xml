@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="pos_primary">#0F766E</color>
+    <color name="pos_on_primary">#FFFFFF</color>
+    <color name="pos_secondary">#DA0081</color>
+    <color name="pos_surface">#F8FAFC</color>
+    <color name="pos_dark">#0F172A</color>
+</resources>

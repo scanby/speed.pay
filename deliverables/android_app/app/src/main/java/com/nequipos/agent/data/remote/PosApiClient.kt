@@ -56,4 +56,29 @@ class PosApiClient {
             SendResult.TransientFailure(-1, e.message ?: "Error de red LAN")
         }
     }
+
+    fun checkHealth(config: ServerConfig): Pair<Boolean, String> {
+        if (config.serverIp.isBlank() || config.serverPort !in 1024..65535) {
+            return false to "IP o puerto inválido."
+        }
+        val request = Request.Builder()
+            .url("${config.baseUrl()}/api/health")
+            .get()
+            .build()
+
+        return try {
+            client.newCall(request).execute().use { response ->
+                if (response.isSuccessful) {
+                    val body = response.body?.string().orEmpty()
+                    val json = JSONObject(body)
+                    val version = json.optString("app_version", json.optString("version", "N/A"))
+                    true to "Conectado al servidor LAN (v$version · HTTP ${response.code})"
+                } else {
+                    false to "Servidor respondió HTTP ${response.code}"
+                }
+            }
+        } catch (e: Exception) {
+            false to "Sin conexión con ${config.serverIp}:${config.serverPort} (${e.message ?: "timeout"})"
+        }
+    }
 }

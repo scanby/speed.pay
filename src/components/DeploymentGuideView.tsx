@@ -26,6 +26,7 @@ pyinstaller --noconfirm --onefile --console ^
 const WIN7_PYINSTALLER_CMD = `cd deliverables\\client_win7
 py -3.8 -m venv .venv38
 .venv38\\Scripts\\activate
+pip install "pip<25" "setuptools<70" wheel
 pip install -r requirements_win7.txt pyinstaller==5.13.2
 
 pyinstaller --noconfirm --onefile --windowed ^
@@ -116,7 +117,7 @@ export const DeploymentGuideView: React.FC = () => {
           <div className="flex items-center justify-between gap-2">
             <h2 className="text-base font-semibold text-slate-900 flex items-center gap-2">
               <GitBranch className="w-4 h-4 text-[#DA0081]" />
-              <span>01. Git Release Automático (.exe Servidor y Cliente)</span>
+              <span>01. Git Release Automático (.exe Windows y .apk Android)</span>
             </h2>
             <button
               type="button"
@@ -128,14 +129,17 @@ export const DeploymentGuideView: React.FC = () => {
             </button>
           </div>
           <p className="text-xs text-slate-600 leading-relaxed">
-            El workflow <code className="font-mono bg-slate-100 px-1 py-0.5 rounded">.github/workflows/release.yml</code> compila ambos ejecutables en GitHub Actions al subir un tag <code className="font-mono bg-slate-100 px-1 py-0.5 rounded">v*</code>:
+            El workflow <code className="font-mono bg-slate-100 px-1 py-0.5 rounded">.github/workflows/release.yml</code> compila los ejecutables Windows y el APK firmado en GitHub Actions al subir un tag <code className="font-mono bg-slate-100 px-1 py-0.5 rounded">v*</code>:
           </p>
           <ul className="text-xs text-slate-700 space-y-1.5 list-disc pl-4">
             <li>
               <span className="font-mono font-semibold">NequiPayPOS_Server_Win10_11.exe</span> · Python 3.11 + FastAPI + TTS + Web POS embebido (Windows 10/11).
             </li>
             <li>
-              <span className="font-mono font-semibold">NequiPayPOS_Client_Win7.exe</span> · Python 3.8.10 x86 + PyInstaller 5.13.2 (compatible Windows 7 SP1 32/64 bits).
+              <span className="font-mono font-semibold">NequiPayPOS_Client_Win7.exe</span> · Python 3.8 x86 + PyInstaller 5.13.2 (compatible Windows 7 SP1 32/64 bits).
+            </li>
+            <li>
+              <span className="font-mono font-semibold">NequiPayPOS_Agent_Android.apk</span> · Kotlin + Room + WorkManager + QR (Android 8.0+, APK firmado listo para instalar).
             </li>
             <li>
               <span className="font-mono font-semibold">SHA256SUMS.txt</span> · Firmas de verificación adjuntas al Release.

@@ -8,22 +8,50 @@ android {
     namespace = "com.nequipos.agent"
     compileSdk = 34
 
+    val releaseVersionCode = (project.findProperty("versionCode") as? String)?.toIntOrNull()
+        ?: System.getenv("APP_VERSION_CODE")?.toIntOrNull()
+        ?: 1
+    val releaseVersionName = (project.findProperty("versionName") as? String)?.takeIf { it.isNotBlank() }
+        ?: System.getenv("APP_VERSION_NAME")?.takeIf { it.isNotBlank() }
+        ?: "1.0.0"
+
     defaultConfig {
         applicationId = "com.nequipos.agent"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = releaseVersionCode
+        versionName = releaseVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    signingConfigs {
+        create("release") {
+            val keystorePath = (project.findProperty("keystorePath") as? String)
+                ?: System.getenv("ANDROID_KEYSTORE_PATH")
+            if (!keystorePath.isNullOrBlank() && file(keystorePath).exists()) {
+                storeFile = file(keystorePath)
+                storePassword = (project.findProperty("keystorePassword") as? String)
+                    ?: System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                keyAlias = (project.findProperty("keyAlias") as? String)
+                    ?: System.getenv("ANDROID_KEY_ALIAS")
+                keyPassword = (project.findProperty("keyPassword") as? String)
+                    ?: System.getenv("ANDROID_KEY_PASSWORD")
+            }
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            val releaseConfig = signingConfigs.getByName("release")
+            if (releaseConfig.storeFile != null) {
+                signingConfig = releaseConfig
+            }
         }
     }
 
@@ -36,6 +64,10 @@ android {
     }
     buildFeatures {
         viewBinding = true
+        buildConfig = true
+    }
+    testOptions {
+        unitTests.isReturnDefaultValues = true
     }
 }
 

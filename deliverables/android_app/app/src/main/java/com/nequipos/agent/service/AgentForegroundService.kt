@@ -12,6 +12,7 @@ import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
+import com.nequipos.agent.R
 import com.nequipos.agent.ui.ConfigActivity
 
 class AgentForegroundService : Service() {
@@ -32,10 +33,10 @@ class AgentForegroundService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "Servicio Activo NequiPay POS",
+                getString(R.string.notification_channel_name),
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Mantiene la captura continua de pagos Nequi en segundo plano."
+                description = getString(R.string.notification_channel_desc)
                 setShowBadge(false)
             }
             val manager = getSystemService(NotificationManager::class.java)
@@ -54,7 +55,7 @@ class AgentForegroundService : Service() {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("NequiPay POS escuchando pagos")
             .setContentText("Sincronización LAN activa en segundo plano")
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setSmallIcon(R.drawable.ic_notification)
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setContentIntent(openIntent)
@@ -67,7 +68,12 @@ class AgentForegroundService : Service() {
 
         fun ensureRunning(context: Context) {
             val intent = Intent(context, AgentForegroundService::class.java)
-            ContextCompat.startForegroundService(context, intent)
+            try {
+                ContextCompat.startForegroundService(context, intent)
+            } catch (_: Exception) {
+                // En Android 12+, si se invoca en segundo plano sin exención de batería,
+                // se reintentará al abrir ConfigActivity o al recibir evento de notificación.
+            }
         }
     }
 }

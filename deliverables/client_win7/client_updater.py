@@ -26,7 +26,7 @@ def get_client_version():
     for path in candidates:
         if os.path.exists(path):
             try:
-                with open(path, "r", encoding="utf-8") as f:
+                with open(path, "r", encoding="utf-8-sig") as f:
                     val = f.read().strip().lstrip("vV")
                 if val:
                     return val

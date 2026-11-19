@@ -29,7 +29,7 @@ def get_installed_version() -> str:
 
     for path in candidates:
         if path.exists():
-            val = path.read_text(encoding="utf-8").strip().lstrip("vV")
+            val = path.read_text(encoding="utf-8-sig").strip().lstrip("vV")
             if val:
                 return val
     return DEFAULT_VERSION

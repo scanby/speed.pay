@@ -1,20 +1,22 @@
 # Guía de Despliegue y Operación 24/7 — NequiPay POS
 
-## 1. Generación Automática de Ejecutables `.exe` vía Git Release (CI/CD)
+## 1. Generación Automática de `.exe` y `.apk` vía Git Release (CI/CD)
 
-El repositorio incluye el workflow `.github/workflows/release.yml` para compilar automáticamente ambos ejecutables en la nube cada vez que publiques un release en Git:
+El repositorio incluye el workflow `.github/workflows/release.yml` para compilar automáticamente los ejecutables de Windows y el APK de Android cada vez que publiques un release en Git:
 
 ```bash
 git add .
-git commit -m "chore: preparar release v1.0.0"
-git tag v1.0.0
+git commit -m "chore: preparar release v0.1.3"
+git tag v0.1.3
 git push origin main --tags
 ```
 
 Al detectar el tag `v*`, GitHub Actions ejecuta en paralelo:
 1. **`NequiPayPOS_Server_Win10_11.exe`** (en `windows-latest` con Python 3.11 + `pytest` + PyInstaller).
-2. **`NequiPayPOS_Client_Win7.exe`** (en `windows-2022` con Python 3.8.10 x86 + PyInstaller 5.13.2, última cadena compatible con Windows 7 SP1 de 32 y 64 bits).
-3. Publica ambos `.exe` y el archivo `SHA256SUMS.txt` directamente en la sección **Releases** de GitHub.
+2. **`NequiPayPOS_Client_Win7.exe`** (en `windows-latest` con Python 3.8 x86 + PyInstaller 5.13.2, compatible con Windows 7 SP1 de 32 y 64 bits).
+3. **`NequiPayPOS_Agent_Android.apk`** (en `ubuntu-latest` con JDK 17 + Gradle 8.7 + pruebas unitarias JUnit + firma APK lista para instalar en Android 8.0+).
+   - *Firma persistente opcional:* Configura en GitHub Secrets `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` y `ANDROID_KEY_PASSWORD` para conservar la misma firma entre actualizaciones. Si no existen, el workflow genera automáticamente un keystore PKCS12 válido para que el APK sea instalable de inmediato.
+4. Publica los binarios y el archivo `SHA256SUMS.txt` directamente en la sección **Releases** de GitHub.
 
 ---
 
@@ -61,6 +63,7 @@ pyinstaller --noconfirm --onefile --console ^
 cd deliverables\client_win7
 py -3.8 -m venv .venv38
 .venv38\Scripts\activate
+pip install "pip<25" "setuptools<70" wheel
 pip install -r requirements_win7.txt pyinstaller==5.13.2
 
 pyinstaller --noconfirm --onefile --windowed ^
