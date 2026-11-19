@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NequiPay POS — Monitor de Caja</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">NequiPay POS</div>
+    <div class="network-bar">
+      <span id="heartbeat-dot" class="status-dot status-offline"></span>
+      <span id="heartbeat-label" class="status-text">Conectando al servidor...</span>
+    </div>
+    <div class="user-actions">
+      <span id="session-user-label" class="muted"></span>
+      <button id="btn-logout" class="btn btn-outline hidden" type="button">Cerrar sesión</button>
+    </div>
+  </header>
+
+  <main id="view-auth" class="auth-wrapper hidden">
+    <section class="panel auth-card">
+      <h1 id="auth-title">Iniciar sesión en Caja POS</h1>
+      <p id="auth-subtitle" class="muted">Ingresa tus credenciales asignadas por el Administrador.</p>
+      <form id="auth-form">
+        <div class="field">
+          <label for="auth-username">Usuario</label>
+          <input id="auth-username" type="text" required autocomplete="username" />
+        </div>
+        <div id="field-fullname" class="field hidden">
+          <label for="auth-fullname">Nombre completo</label>
+          <input id="auth-fullname" type="text" />
+        </div>
+        <div class="field">
+          <label for="auth-password">Contraseña</label>
+          <input id="auth-password" type="password" required autocomplete="current-password" />
+        </div>
+        <div id="auth-error" class="error-box hidden"></div>
+        <button id="auth-submit" class="btn btn-primary full-width" type="submit">Ingresar</button>
+      </form>
+    </section>
+  </main>
+
+  <main id="view-pos" class="pos-container hidden">
+    <div class="toolbar">
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="monitor" type="button">Monitor en Vivo (Hoy)</button>
+        <button class="tab-btn admin-only hidden" data-tab="history" type="button">Reportes Históricos</button>
+        <button class="tab-btn admin-only hidden" data-tab="admin" type="button">Configuración y QR</button>
+      </div>
+      <div class="audio-controls">
+        <button id="btn-enable-audio" class="btn btn-outline" type="button">Activar Audio Web</button>
+      </div>
+    </div>
+
+    <section id="tab-monitor" class="tab-section">
+      <div id="live-alert-banner" class="alert-banner hidden">
+        <div class="alert-title">Último pago recibido</div>
+        <div id="live-alert-amount" class="alert-amount">$0</div>
+        <div id="live-alert-meta" class="alert-meta"></div>
+      </div>
+
+      <div id="admin-today-kpi" class="kpi-strip admin-only hidden">
+        <div class="kpi-item">
+          <div class="kpi-label">Depósitos de hoy</div>
+          <div id="kpi-today-count" class="kpi-value">0</div>
+        </div>
+        <div class="kpi-item">
+          <div class="kpi-label">Total recaudado hoy</div>
+          <div id="kpi-today-total" class="kpi-value">$0</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <h2>Movimientos del día</h2>
+          <span id="today-date-label" class="muted"></span>
+        </div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Hora</th>
+              <th>Cuenta Nequi</th>
+              <th>Remitente</th>
+              <th class="text-right">Monto COP</th>
+            </tr>
+          </thead>
+          <tbody id="today-tbody">
+            <tr><td colspan="4" class="empty-cell">Esperando depósitos de Nequi...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="tab-history" class="tab-section hidden admin-only">
+      <div class="panel">
+        <div class="panel-header">
+          <h2>Auditoría histórica</h2>
+          <div class="filter-row">
+            <input id="filter-start" type="date" />
+            <input id="filter-end" type="date" />
+            <button id="btn-search-history" class="btn btn-primary" type="button">Consultar</button>
+            <button id="btn-export-csv" class="btn btn-outline" type="button">Exportar CSV / Excel</button>
+          </div>
+        </div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Fecha y Hora</th>
+              <th>Cuenta Nequi</th>
+              <th>Remitente</th>
+              <th>Hash SHA-256</th>
+              <th class="text-right">Monto COP</th>
+            </tr>
+          </thead>
+          <tbody id="history-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="tab-admin" class="tab-section hidden admin-only">
+      <div class="admin-grid">
+        <div class="panel">
+          <h2>Vinculación QR para Android</h2>
+          <p class="muted">Escanea este código desde la App Android para configurar IP, Puerto y Token.</p>
+          <div class="qr-box">
+            <img id="qr-image" alt="Código QR de configuración" />
+          </div>
+          <div class="config-meta">
+            <div>IP Local: <strong id="cfg-ip"></strong></div>
+            <div>Puerto: <strong id="cfg-port"></strong></div>
+            <div>Token API: <code id="cfg-token"></code></div>
+          </div>
+          <div class="btn-row">
+            <button id="btn-rotate-token" class="btn btn-outline" type="button">Rotar Token</button>
+            <button id="btn-test-sound" class="btn btn-primary" type="button">Probar Sonido ($50.000)</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>Cajeros (Rol Invitado)</h2>
+          <form id="form-new-cashier" class="inline-form">
+            <input id="cashier-user" type="text" placeholder="Usuario" required />
+            <input id="cashier-name" type="text" placeholder="Nombre completo" required />
+            <input id="cashier-pass" type="password" placeholder="Contraseña" required />
+            <button class="btn btn-primary" type="submit">Crear Cajero</button>
+          </form>
+          <ul id="users-list" class="simple-list"></ul>
+
+          <h2 style="margin-top:24px;">Cuentas Nequi Vinculadas</h2>
+          <form id="form-new-account" class="inline-form">
+            <input id="acc-alias" type="text" placeholder="Alias (Ej: Caja 1)" required />
+            <input id="acc-phone" type="text" placeholder="Celular Nequi" required />
+            <input id="acc-device" type="text" placeholder="Teléfono" required />
+            <button class="btn btn-primary" type="submit">Agregar Cuenta</button>
+          </form>
+          <ul id="accounts-list" class="simple-list"></ul>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <audio id="pos-audio-player" preload="auto"></audio>
+  <script src="app.js"></script>
+</body>
+</html>

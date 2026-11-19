@@ -1,0 +1,6 @@
+# Dependencias compatibles con Python 3.8.10 (Última versión oficial para Windows 7 SP1)
+python-socketio[client]==5.7.2
+requests==2.31.0
+pystray==0.19.4
+Pillow==9.5.0
+pygame==2.1.3

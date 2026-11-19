@@ -1,0 +1,6 @@
+{
+  "name": "NequiPay POS — Sistema Distribuido de Auditoría y Voz",
+  "description": "Arquitectura distribuida en LAN para recepción, auditoría idempotente y notificación por voz de pagos Nequi en puntos de venta (FastAPI, Cliente Windows 7 y Android Kotlin).",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
