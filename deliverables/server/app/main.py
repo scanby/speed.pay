@@ -10,7 +10,7 @@ import socketio
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.infrastructure.config import detect_lan_ip, logger, settings
@@ -60,8 +60,9 @@ async def lifespan(_app: FastAPI):
     lan_ip = detect_lan_ip()
     bg_task = asyncio.create_task(_unattended_auto_update_loop())
     logger.info(
-        "NequiPay POS Central v%s iniciado en http://%s:%s (Modo WAL activo)",
+        "NequiPay POS Central v%s iniciado | Local: http://127.0.0.1:%s/pos/ | LAN: http://%s:%s/pos/ (Modo WAL activo)",
         get_installed_version(),
+        settings.SERVER_PORT,
         lan_ip,
         settings.SERVER_PORT,
     )
@@ -113,9 +114,8 @@ def health_check() -> dict:
 
 @fastapi_app.get("/")
 def root_redirect():
-    index_file = CLIENT_WEB_DIR / "index.html"
-    if index_file.exists():
-        return FileResponse(str(index_file))
+    if CLIENT_WEB_DIR.exists():
+        return RedirectResponse(url="/pos/", status_code=307)
     return {"service": settings.APP_NAME, "status": "running"}
 
 
@@ -124,9 +124,13 @@ app = socketio.ASGIApp(socket_manager.sio, other_asgi_app=fastapi_app)
 
 
 if __name__ == "__main__":
-    uvicorn.run(
-        app,
-        host=settings.SERVER_HOST,
-        port=settings.SERVER_PORT,
-        log_level="info",
-    )
+    try:
+        uvicorn.run(
+            app,
+            host=settings.SERVER_HOST,
+            port=settings.SERVER_PORT,
+            log_level="info",
+        )
+    except Exception as exc:
+        logger.critical("Error fatal al iniciar el servidor en el puerto %s: %s", settings.SERVER_PORT, exc)
+        raise

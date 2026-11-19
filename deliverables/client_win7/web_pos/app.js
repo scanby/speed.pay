@@ -57,7 +57,22 @@
   }
 
   function startHeartbeatAndSocket() {
-    if (state.socket) {
+    if (state.socket || state.heartbeatTimer) {
+      return;
+    }
+
+    if (typeof window.io !== "function") {
+      setNetworkStatus(true, "Modo LAN (Polling 5s)");
+      state.heartbeatTimer = setInterval(function () {
+        apiRequest("GET", "/api/health", null, function (status) {
+          if (status === 200) {
+            setNetworkStatus(true, "Polling 5s OK");
+            loadTodayDeposits();
+          } else {
+            setNetworkStatus(false, "Sin respuesta del servidor LAN");
+          }
+        });
+      }, 5000);
       return;
     }
 
