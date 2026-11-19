@@ -187,9 +187,10 @@
           <form id="form-new-cashier" class="inline-form">
             <input id="cashier-user" type="text" placeholder="Usuario" required />
             <input id="cashier-name" type="text" placeholder="Nombre completo" required />
-            <input id="cashier-pass" type="password" placeholder="Contraseña" required />
+            <input id="cashier-pass" type="password" placeholder="Contraseña (mín. 6)" required />
             <button class="btn btn-primary" type="submit">Crear Cajero</button>
           </form>
+          <div id="cashier-feedback" class="muted" style="margin:6px 0;"></div>
           <ul id="users-list" class="simple-list"></ul>
 
           <h2 style="margin-top:24px;">Cuentas Nequi Vinculadas</h2>
@@ -199,6 +200,7 @@
             <input id="acc-device" type="text" placeholder="Teléfono" required />
             <button class="btn btn-primary" type="submit">Agregar Cuenta</button>
           </form>
+          <div id="account-feedback" class="muted" style="margin:6px 0;"></div>
           <ul id="accounts-list" class="simple-list"></ul>
         </div>
       </div>

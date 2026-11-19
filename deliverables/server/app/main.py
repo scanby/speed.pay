@@ -104,11 +104,18 @@ if CLIENT_WEB_DIR.exists():
 
 @fastapi_app.get("/api/health")
 def health_check() -> dict:
+    github_repo = ""
+    try:
+        with SessionLocal() as db:
+            github_repo = SqlAlchemyConfigRepository(db).get_settings().github_repo
+    except Exception:
+        github_repo = ""
     return {
         "status": "online",
         "app_version": get_installed_version(),
         "lan_ip": detect_lan_ip(),
         "active_pos_clients": socket_manager.get_active_client_count(),
+        "github_repo": github_repo,
     }
 
 

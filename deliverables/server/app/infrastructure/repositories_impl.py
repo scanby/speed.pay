@@ -54,7 +54,8 @@ class SqlAlchemyUserRepository(IUserRepository):
         return self._db.query(func.count(UserModel.id)).scalar() or 0
 
     def get_by_username(self, username: str) -> Optional[User]:
-        row = self._db.query(UserModel).filter(UserModel.username == username).first()
+        normalized = username.strip().lower()
+        row = self._db.query(UserModel).filter(func.lower(UserModel.username) == normalized).first()
         return self._to_entity(row) if row else None
 
     def get_by_id(self, user_id: int) -> Optional[User]:

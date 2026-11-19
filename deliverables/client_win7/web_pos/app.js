@@ -330,22 +330,45 @@
     });
   }
 
+  function formatApiError(data, fallback) {
+    if (!data || !data.detail) {
+      return fallback;
+    }
+    if (typeof data.detail === "string") {
+      return data.detail;
+    }
+    if (Object.prototype.toString.call(data.detail) === "[object Array]" && data.detail.length > 0) {
+      var msgs = [];
+      for (var i = 0; i < data.detail.length; i++) {
+        var item = data.detail[i];
+        if (item && item.msg) {
+          msgs.push(item.msg);
+        }
+      }
+      if (msgs.length > 0) {
+        return msgs.join(" · ");
+      }
+    }
+    return fallback;
+  }
+
   el("auth-form").addEventListener("submit", function (e) {
     e.preventDefault();
     var endpoint = state.requiresSetup ? "/api/auth/setup" : "/api/auth/login";
     var payload = {
-      username: el("auth-username").value,
+      username: el("auth-username").value.trim(),
       password: el("auth-password").value
     };
     if (state.requiresSetup) {
-      payload.full_name = el("auth-fullname").value;
+      payload.full_name = el("auth-fullname").value.trim();
     }
     apiRequest("POST", endpoint, payload, function (status, data) {
       if (status >= 200 && status < 300 && data && data.user) {
+        state.requiresSetup = false;
         el("auth-error").classList.add("hidden");
         renderAuthenticatedView(data.user);
       } else {
-        el("auth-error").textContent = (data && data.detail) || "Error de autenticación.";
+        el("auth-error").textContent = formatApiError(data, "Error de autenticación.");
         el("auth-error").classList.remove("hidden");
       }
     });
@@ -549,28 +572,38 @@
 
   el("form-new-cashier").addEventListener("submit", function (e) {
     e.preventDefault();
+    var fb = el("cashier-feedback");
+    if (fb) fb.textContent = "Creando cajero...";
     apiRequest("POST", "/api/admin/users", {
-      username: el("cashier-user").value,
-      full_name: el("cashier-name").value,
+      username: el("cashier-user").value.trim(),
+      full_name: el("cashier-name").value.trim(),
       password: el("cashier-pass").value
-    }, function (status) {
+    }, function (status, data) {
       if (status === 201) {
         el("form-new-cashier").reset();
+        if (fb) fb.textContent = "Cajero creado correctamente.";
         loadAdminPanel();
+      } else {
+        if (fb) fb.textContent = formatApiError(data, "No se pudo crear el cajero (mínimo 6 caracteres en contraseña y usuario sin espacios).");
       }
     });
   });
 
   el("form-new-account").addEventListener("submit", function (e) {
     e.preventDefault();
+    var fb = el("account-feedback");
+    if (fb) fb.textContent = "Registrando cuenta...";
     apiRequest("POST", "/api/admin/accounts", {
-      alias: el("acc-alias").value,
-      phone_number: el("acc-phone").value,
-      device_label: el("acc-device").value
-    }, function (status) {
+      alias: el("acc-alias").value.trim(),
+      phone_number: el("acc-phone").value.trim(),
+      device_label: el("acc-device").value.trim()
+    }, function (status, data) {
       if (status === 201) {
         el("form-new-account").reset();
+        if (fb) fb.textContent = "Cuenta Nequi registrada correctamente.";
         loadAdminPanel();
+      } else {
+        if (fb) fb.textContent = formatApiError(data, "No se pudo registrar la cuenta (verifica los campos).");
       }
     });
   });

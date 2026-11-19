@@ -2,8 +2,10 @@ package com.nequipos.agent
 
 import com.nequipos.agent.domain.parser.NequiNotificationParser
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.math.BigDecimal
 
@@ -43,6 +45,58 @@ class NequiNotificationParserTest {
         assertNotNull(result)
         assertEquals(BigDecimal("8000"), result!!.amountCop)
         assertEquals("Tienda La Esquina", result.senderName)
+    }
+
+    @Test
+    fun `parses sender te envio format common in Nequi Colombia`() {
+        val result = NequiNotificationParser.parse(
+            title = "¡Plata nueva!",
+            body = "Carlos Mendoza te envió $45.000 a tu Nequi.",
+            capturedAtEpochMs = 1715000000000L
+        )
+        assertNotNull(result)
+        assertEquals(BigDecimal("45000"), result!!.amountCop)
+        assertEquals("Carlos Mendoza", result.senderName)
+    }
+
+    @Test
+    fun `parses Te llego plata de remitente por monto`() {
+        val result = NequiNotificationParser.parse(
+            title = "Nequi",
+            body = "Te llegó plata de Laura Martínez por $72.500",
+            capturedAtEpochMs = 1715000000000L
+        )
+        assertNotNull(result)
+        assertEquals(BigDecimal("72500"), result!!.amountCop)
+        assertEquals("Laura Martínez", result.senderName)
+    }
+
+    @Test
+    fun `parses Recibiste plata split between title and body and QR payments`() {
+        val splitResult = NequiNotificationParser.parse(
+            title = "Recibiste plata",
+            body = "$30.000 de Andrés Rojas",
+            capturedAtEpochMs = 1715000000000L
+        )
+        assertNotNull(splitResult)
+        assertEquals(BigDecimal("30000"), splitResult!!.amountCop)
+        assertEquals("Andrés Rojas", splitResult.senderName)
+
+        val qrResult = NequiNotificationParser.parse(
+            title = "Pago con QR",
+            body = "Recibiste un pago con QR de $18.000",
+            capturedAtEpochMs = 1715000000000L
+        )
+        assertNotNull(qrResult)
+        assertEquals(BigDecimal("18000"), qrResult!!.amountCop)
+    }
+
+    @Test
+    fun `matches Nequi packages safely while excluding self`() {
+        assertTrue(NequiNotificationParser.isNequiPackage("com.nequi.MobileApp"))
+        assertTrue(NequiNotificationParser.isNequiPackage("com.nequi.negocios"))
+        assertFalse(NequiNotificationParser.isNequiPackage("com.nequipos.agent"))
+        assertFalse(NequiNotificationParser.isNequiPackage("com.whatsapp"))
     }
 
     @Test

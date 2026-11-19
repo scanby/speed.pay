@@ -9,10 +9,8 @@ import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
-import com.nequipos.agent.data.local.AppDatabase
-import com.nequipos.agent.data.local.SecureConfigStore
-import com.nequipos.agent.data.remote.PosApiClient
-import com.nequipos.agent.data.remote.SendResult
+import com.nequipos.agent.data.remote.DepositSyncManager
+import com.nequipos.agent.data.remote.SyncQueueResult
 import java.util.concurrent.TimeUnit
 
 class SyncDepositsWorker(
@@ -21,32 +19,11 @@ class SyncDepositsWorker(
 ) : CoroutineWorker(appContext, params) {
 
     override suspend fun doWork(): Result {
-        val db = AppDatabase.getInstance(applicationContext)
-        val dao = db.pendingDepositDao()
-        val config = SecureConfigStore(applicationContext).getServerConfig()
-
-        if (!config.isConfigured) {
-            return Result.retry()
+        return when (DepositSyncManager.syncPendingQueue(applicationContext)) {
+            is SyncQueueResult.AllSynced -> Result.success()
+            is SyncQueueResult.NotConfigured,
+            is SyncQueueResult.Failed -> Result.retry()
         }
-
-        val apiClient = PosApiClient()
-        // Drena la cola persistente en estricto orden cronológico
-        val queue = dao.getAllChronological()
-
-        for (item in queue) {
-            when (apiClient.sendDeposit(config, item)) {
-                is SendResult.Success,
-                is SendResult.DuplicateIgnored -> {
-                    dao.deleteById(item.id)
-                }
-                is SendResult.TransientFailure -> {
-                    dao.incrementRetry(item.id)
-                    // Detiene la iteración para preservar el orden cronológico en el siguiente reintento
-                    return Result.retry()
-                }
-            }
-        }
-        return Result.success()
     }
 
     companion object {
@@ -62,9 +39,10 @@ class SyncDepositsWorker(
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 5, TimeUnit.SECONDS)
                 .build()
 
+            // REPLACE garantiza ejecución inmediata al capturar un nuevo pago o pulsar sincronizar
             WorkManager.getInstance(context).enqueueUniqueWork(
                 UNIQUE_SYNC_WORK,
-                ExistingWorkPolicy.APPEND_OR_REPLACE,
+                ExistingWorkPolicy.REPLACE,
                 request
             )
         }
