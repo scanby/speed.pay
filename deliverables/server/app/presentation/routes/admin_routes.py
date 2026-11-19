@@ -15,10 +15,12 @@ from app.application.dtos import (
     UpdateConfigIn,
     UpdateInstallOut,
     UserOut,
+    VoiceOptionOut,
 )
 from app.application.use_cases import AdminUseCases
 from app.domain.entities import User
 from app.domain.exceptions import ForbiddenError, ResourceNotFoundError
+from app.infrastructure.tts_service import AVAILABLE_VOICES
 from app.presentation.dependencies import get_admin_use_cases, require_admin
 
 router = APIRouter(prefix="/api/admin", tags=["Administración"])
@@ -81,6 +83,13 @@ def create_account(
         return use_cases.create_account(payload, admin.username, client_ip)
     except ForbiddenError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+
+
+@router.get("/voices", response_model=List[VoiceOptionOut])
+def list_voices(
+    _admin: User = Depends(require_admin),
+) -> List[VoiceOptionOut]:
+    return [VoiceOptionOut(**item) for item in AVAILABLE_VOICES]
 
 
 @router.get("/config", response_model=ServerConfigOut)

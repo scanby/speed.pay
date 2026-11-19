@@ -206,7 +206,11 @@ class DepositUseCases:
 
         audio_filename: Optional[str] = None
         if sys_cfg.tts_enabled:
-            audio_filename = await self._tts.synthesize_deposit_phrase(tts_phrase, tx_hash)
+            audio_filename = await self._tts.synthesize_deposit_phrase(
+                tts_phrase,
+                tx_hash,
+                voice=sys_cfg.tts_voice,
+            )
 
         saved = self._tx.create(
             DepositTransaction(
@@ -416,11 +420,15 @@ class AdminUseCases:
         saved = self._config.save_settings(
             ServerSettings(
                 api_token=current.api_token,
-                server_port=payload.server_port,
+                server_port=payload.server_port if payload.server_port is not None else current.server_port,
                 tts_enabled=payload.tts_enabled,
-                tts_voice=payload.tts_voice,
-                github_repo=payload.github_repo.strip(),
-                auto_update_enabled=payload.auto_update_enabled,
+                tts_voice=payload.tts_voice.strip(),
+                github_repo=payload.github_repo.strip() if payload.github_repo is not None else current.github_repo,
+                auto_update_enabled=(
+                    payload.auto_update_enabled
+                    if payload.auto_update_enabled is not None
+                    else current.auto_update_enabled
+                ),
             )
         )
         self._audit.record(
@@ -428,7 +436,7 @@ class AdminUseCases:
                 id=None,
                 actor_username=actor,
                 action="UPDATE_CONFIG",
-                details=f"Port={saved.server_port}, TTS={saved.tts_enabled}, Repo={saved.github_repo}",
+                details=f"Port={saved.server_port}, TTS={saved.tts_enabled}, Voice={saved.tts_voice}, Repo={saved.github_repo}",
                 ip_address=client_ip,
             )
         )
@@ -540,8 +548,13 @@ class AdminUseCases:
         )
 
     async def test_sound(self, amount: Decimal) -> dict:
+        sys_cfg = self._config.get_settings()
         phrase = build_tts_phrase(amount)
-        audio_file = await self._tts.synthesize_deposit_phrase(phrase, f"test_{int(amount)}")
+        audio_file = await self._tts.synthesize_deposit_phrase(
+            phrase,
+            f"test_{int(amount)}",
+            voice=sys_cfg.tts_voice,
+        )
         payload = {
             "id": 0,
             "idempotency_hash": "test-sound",
@@ -551,6 +564,7 @@ class AdminUseCases:
             "amount_cop": f"{amount:.2f}",
             "amount_words": monto_a_letras(amount),
             "tts_phrase": phrase,
+            "tts_voice": sys_cfg.tts_voice,
             "audio_url": f"/static/audio/{audio_file}" if audio_file else None,
             "source": "MANUAL_TEST",
             "captured_at": datetime.utcnow().isoformat(),

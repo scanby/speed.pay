@@ -19,6 +19,7 @@ import {
   formatCop,
   montoALetras,
   parseNequiNotification,
+  SPANISH_VOICE_PRESETS,
   speakSpanishPosPhrase,
 } from "../utils/posDomain";
 
@@ -154,6 +155,7 @@ export const PosMonitorView: React.FC = () => {
     message: string;
   } | null>(null);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const [ttsVoice, setTtsVoice] = useState<string>("es-CO-SalomeNeural");
 
   // Configuración LAN & QR
   const [lanIp, setLanIp] = useState("192.168.1.50");
@@ -299,7 +301,7 @@ export const PosMonitorView: React.FC = () => {
     setDeposits((prev) => [record, ...prev]);
     setLastAlert(record);
     if (voiceEnabled) {
-      speakSpanishPosPhrase(record.ttsPhrase);
+      speakSpanishPosPhrase(record.ttsPhrase, ttsVoice);
     }
     return "ok";
   }
@@ -930,6 +932,22 @@ export const PosMonitorView: React.FC = () => {
                       <span>Rotar</span>
                     </button>
                   </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                    Voz de Notificación (Español / Colombia)
+                  </label>
+                  <select
+                    value={ttsVoice}
+                    onChange={(e) => setTtsVoice(e.target.value)}
+                    className="w-full px-3 py-1.5 text-xs border border-slate-300 rounded-md bg-white text-slate-800"
+                  >
+                    {SPANISH_VOICE_PRESETS.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {v.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <button
                   type="button"

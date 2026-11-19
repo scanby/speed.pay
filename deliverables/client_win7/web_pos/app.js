@@ -120,8 +120,59 @@
     }, 5000);
   }
 
-  function playAudioAlert(audioUrl) {
+  function speakBrowserSpanishFallback(phrase) {
+    if (!phrase || typeof window.speechSynthesis === "undefined") {
+      return;
+    }
+    try {
+      window.speechSynthesis.cancel();
+      var utterance = new SpeechSynthesisUtterance(phrase);
+      var voices = window.speechSynthesis.getVoices() || [];
+      var selected = null;
+      var i;
+      // 1. Priorizar voz femenina colombiana
+      for (i = 0; i < voices.length; i++) {
+        var lang = (voices[i].lang || "").toLowerCase();
+        var name = (voices[i].name || "").toLowerCase();
+        if (lang.indexOf("es-co") === 0 && (name.indexOf("salome") !== -1 || name.indexOf("female") !== -1 || name.indexOf("mujer") !== -1)) {
+          selected = voices[i];
+          break;
+        }
+      }
+      // 2. Cualquier voz colombiana o femenina en español
+      if (!selected) {
+        for (i = 0; i < voices.length; i++) {
+          var l2 = (voices[i].lang || "").toLowerCase();
+          var n2 = (voices[i].name || "").toLowerCase();
+          if (l2.indexOf("es-co") === 0 || (l2.indexOf("es") === 0 && (n2.indexOf("sabina") !== -1 || n2.indexOf("helena") !== -1 || n2.indexOf("paulina") !== -1 || n2.indexOf("dalia") !== -1 || n2.indexOf("elvira") !== -1 || n2.indexOf("google español") !== -1))) {
+            selected = voices[i];
+            break;
+          }
+        }
+      }
+      // 3. Cualquier voz en español
+      if (!selected) {
+        for (i = 0; i < voices.length; i++) {
+          if ((voices[i].lang || "").toLowerCase().indexOf("es") === 0) {
+            selected = voices[i];
+            break;
+          }
+        }
+      }
+      if (selected) {
+        utterance.voice = selected;
+      }
+      utterance.lang = "es-CO";
+      utterance.rate = 0.96;
+      window.speechSynthesis.speak(utterance);
+    } catch (e) {
+      /* Ignorar si el navegador no soporta speechSynthesis */
+    }
+  }
+
+  function playAudioAlert(audioUrl, fallbackPhrase) {
     if (!audioUrl) {
+      speakBrowserSpanishFallback(fallbackPhrase);
       return;
     }
     var player = el("pos-audio-player");
@@ -141,7 +192,7 @@
     el("live-alert-meta").textContent =
       tx.account_alias + " · De: " + tx.sender_name + " · " + tx.tts_phrase;
 
-    playAudioAlert(tx.audio_url);
+    playAudioAlert(tx.audio_url, tx.tts_phrase);
     loadTodayDeposits();
   }
 
@@ -176,14 +227,32 @@
   }
 
   function loadAdminPanel() {
-    apiRequest("GET", "/api/admin/config", null, function (status, cfg) {
-      if (status === 200 && cfg) {
-        el("cfg-ip").textContent = cfg.lan_ip;
-        el("cfg-port").textContent = String(cfg.server_port);
-        el("cfg-token").textContent = cfg.api_token;
-        if (el("cfg-version")) el("cfg-version").textContent = cfg.app_version || "1.0.0";
-        if (el("cfg-repo")) el("cfg-repo").textContent = cfg.github_repo || "";
+    apiRequest("GET", "/api/admin/voices", null, function (vStatus, voices) {
+      if (vStatus === 200 && voices && el("cfg-tts-voice")) {
+        var select = el("cfg-tts-voice");
+        var currentVal = select.value;
+        select.innerHTML = "";
+        for (var i = 0; i < voices.length; i++) {
+          var opt = document.createElement("option");
+          opt.value = voices[i].id;
+          opt.textContent = voices[i].label;
+          select.appendChild(opt);
+        }
+        if (currentVal) {
+          select.value = currentVal;
+        }
       }
+      apiRequest("GET", "/api/admin/config", null, function (status, cfg) {
+        if (status === 200 && cfg) {
+          el("cfg-ip").textContent = cfg.lan_ip;
+          el("cfg-port").textContent = String(cfg.server_port);
+          el("cfg-token").textContent = cfg.api_token;
+          if (el("cfg-version")) el("cfg-version").textContent = cfg.app_version || "1.0.0";
+          if (el("cfg-repo")) el("cfg-repo").textContent = cfg.github_repo || "";
+          if (el("cfg-tts-voice") && cfg.tts_voice) el("cfg-tts-voice").value = cfg.tts_voice;
+          if (el("cfg-tts-enabled")) el("cfg-tts-enabled").checked = Boolean(cfg.tts_enabled);
+        }
+      });
     });
     apiRequest("GET", "/api/admin/config/qr", null, function (status, qr) {
       if (status === 200 && qr) {
@@ -319,8 +388,46 @@
   });
 
   el("btn-test-sound").addEventListener("click", function () {
-    apiRequest("POST", "/api/admin/test-sound?amount=50000", {}, function () {});
+    apiRequest("POST", "/api/admin/test-sound?amount=50000", {}, function (status, payload) {
+      if (status === 200 && payload) {
+        var msgBox = el("voice-status-msg");
+        if (msgBox) {
+          msgBox.textContent = payload.audio_url
+            ? "Audio generado con voz: " + (payload.tts_voice || "es-CO-SalomeNeural")
+            : "Sin audio del servidor; usando voz local del navegador.";
+        }
+        if (!state.socket || !state.socket.connected) {
+          playAudioAlert(payload.audio_url, payload.tts_phrase);
+        }
+      }
+    });
   });
+
+  if (el("btn-save-voice")) {
+    el("btn-save-voice").addEventListener("click", function () {
+      var msgBox = el("voice-status-msg");
+      var voiceId = el("cfg-tts-voice") ? el("cfg-tts-voice").value : "es-CO-SalomeNeural";
+      var enabled = el("cfg-tts-enabled") ? el("cfg-tts-enabled").checked : true;
+      if (msgBox) msgBox.textContent = "Guardando configuración de voz...";
+      apiRequest(
+        "PUT",
+        "/api/admin/config",
+        {
+          tts_enabled: enabled,
+          tts_voice: voiceId
+        },
+        function (status, updated) {
+          if (status === 200 && updated) {
+            if (msgBox) {
+              msgBox.textContent = "Voz guardada (" + updated.tts_voice + "). Pulsa Probar Sonido para verificar.";
+            }
+          } else {
+            if (msgBox) msgBox.textContent = "Error guardando configuración de voz.";
+          }
+        }
+      );
+    });
+  }
 
   if (el("btn-check-updates")) {
     el("btn-check-updates").addEventListener("click", function () {

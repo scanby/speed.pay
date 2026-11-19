@@ -90,6 +90,11 @@ class IConfigRepository(ABC):
 
 class ITtsService(ABC):
     @abstractmethod
-    async def synthesize_deposit_phrase(self, phrase: str, tx_hash: str) -> Optional[str]:
+    async def synthesize_deposit_phrase(
+        self,
+        phrase: str,
+        tx_hash: str,
+        voice: Optional[str] = None,
+    ) -> Optional[str]:
         """Generates an audio file (.mp3 or .wav) and returns the relative filename."""
         ...

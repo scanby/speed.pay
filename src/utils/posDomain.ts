@@ -185,7 +185,17 @@ export function parseNequiNotification(rawText: string): ParsedNotification | nu
   return null;
 }
 
-export function speakSpanishPosPhrase(phrase: string): void {
+export const SPANISH_VOICE_PRESETS = [
+  { id: "es-CO-SalomeNeural", label: "Salomé — Español (Colombia · Femenina)" },
+  { id: "gtts-es-co", label: "Voz Colombia Estándar — Español (Colombia · Femenina)" },
+  { id: "es-CO-GonzaloNeural", label: "Gonzalo — Español (Colombia · Masculina)" },
+  { id: "es-MX-DaliaNeural", label: "Dalia — Español (México · Femenina)" },
+  { id: "es-ES-ElviraNeural", label: "Elvira — Español (España · Femenina)" },
+  { id: "es-AR-ElenaNeural", label: "Elena — Español (Argentina · Femenina)" },
+  { id: "es-VE-PaolaNeural", label: "Paola — Español (Venezuela · Femenina)" },
+] as const;
+
+export function speakSpanishPosPhrase(phrase: string, preferredVoiceId = "es-CO-SalomeNeural"): void {
   try {
     // 1. Timbre suave de caja POS con Web Audio API
     const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
@@ -207,19 +217,44 @@ export function speakSpanishPosPhrase(phrase: string): void {
     // Ignorar si AudioContext no está disponible
   }
 
-  // 2. Síntesis de voz en español
+  // 2. Síntesis de voz en español (priorizando voz femenina colombiana)
   if (typeof window !== "undefined" && "speechSynthesis" in window) {
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(phrase);
     const voices = window.speechSynthesis.getVoices();
-    const esVoice =
-      voices.find((v) => v.lang.toLowerCase().startsWith("es-co")) ||
-      voices.find((v) => v.lang.toLowerCase().startsWith("es"));
-    if (esVoice) {
-      utterance.voice = esVoice;
+    const isMale = preferredVoiceId.includes("Gonzalo");
+    const targetLang = preferredVoiceId.startsWith("es-MX")
+      ? "es-mx"
+      : preferredVoiceId.startsWith("es-ES")
+      ? "es-es"
+      : preferredVoiceId.startsWith("es-AR")
+      ? "es-ar"
+      : preferredVoiceId.startsWith("es-VE")
+      ? "es-ve"
+      : "es-co";
+
+    const femaleHints = ["salome", "sabina", "helena", "paulina", "dalia", "elvira", "elena", "paola", "female", "mujer", "google español"];
+    const maleHints = ["gonzalo", "raul", "pablo", "male", "hombre"];
+    const genderHints = isMale ? maleHints : femaleHints;
+
+    const esVoices = voices.filter((v) => v.lang.toLowerCase().startsWith("es"));
+    const selected =
+      esVoices.find(
+        (v) =>
+          v.lang.toLowerCase().startsWith(targetLang) &&
+          genderHints.some((h) => v.name.toLowerCase().includes(h))
+      ) ||
+      esVoices.find((v) => v.lang.toLowerCase().startsWith(targetLang)) ||
+      esVoices.find((v) => genderHints.some((h) => v.name.toLowerCase().includes(h))) ||
+      esVoices.find((v) => v.lang.toLowerCase().startsWith("es-co")) ||
+      esVoices[0];
+
+    if (selected) {
+      utterance.voice = selected;
     }
-    utterance.lang = "es-CO";
+    utterance.lang = targetLang === "es-es" ? "es-ES" : "es-CO";
     utterance.rate = 0.96;
+    utterance.pitch = isMale ? 0.95 : 1.04;
     window.speechSynthesis.speak(utterance);
   }
 }

@@ -111,9 +111,17 @@ class ServerConfigOut(BaseModel):
 class UpdateConfigIn(BaseModel):
     tts_enabled: bool
     tts_voice: str = Field(min_length=3, max_length=64)
-    server_port: int = Field(ge=1024, le=65535)
-    github_repo: str = Field(min_length=3, max_length=160)
-    auto_update_enabled: bool = True
+    server_port: Optional[int] = Field(default=None, ge=1024, le=65535)
+    github_repo: Optional[str] = Field(default=None, min_length=3, max_length=160)
+    auto_update_enabled: Optional[bool] = None
+
+
+class VoiceOptionOut(BaseModel):
+    id: str
+    label: str
+    accent: str
+    gender: str
+    provider: str
 
 
 class QrConfigOut(BaseModel):

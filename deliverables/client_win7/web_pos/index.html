@@ -140,6 +140,30 @@
           </div>
 
           <hr style="margin:20px 0;border:none;border-top:1px solid #e2e8f0;" />
+          <h2>Voz de Notificación (Español)</h2>
+          <p class="muted">Selecciona el acento y tipo de voz para anunciar los pagos recibidos.</p>
+          <div class="field" style="margin-top:10px;">
+            <label for="cfg-tts-voice">Voz TTS del Servidor</label>
+            <select id="cfg-tts-voice" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;">
+              <option value="es-CO-SalomeNeural">Salomé — Español (Colombia · Femenina)</option>
+              <option value="gtts-es-co">Voz Colombia Estándar — Español (Colombia · Femenina)</option>
+              <option value="es-CO-GonzaloNeural">Gonzalo — Español (Colombia · Masculina)</option>
+              <option value="es-MX-DaliaNeural">Dalia — Español (México · Femenina)</option>
+              <option value="es-ES-ElviraNeural">Elvira — Español (España · Femenina)</option>
+              <option value="es-AR-ElenaNeural">Elena — Español (Argentina · Femenina)</option>
+              <option value="es-VE-PaolaNeural">Paola — Español (Venezuela · Femenina)</option>
+            </select>
+          </div>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin:8px 0;">
+            <input id="cfg-tts-enabled" type="checkbox" checked />
+            <span>Activar anuncio de voz automático</span>
+          </label>
+          <div id="voice-status-msg" class="muted" style="margin:6px 0;"></div>
+          <div class="btn-row">
+            <button id="btn-save-voice" class="btn btn-primary" type="button">Guardar Voz</button>
+          </div>
+
+          <hr style="margin:20px 0;border:none;border-top:1px solid #e2e8f0;" />
           <h2>Actualizaciones Desatendidas</h2>
           <p class="muted">Versión instalada: <strong id="cfg-version">1.0.0</strong> · Repositorio: <code id="cfg-repo"></code></p>
           <div id="update-status-box" class="muted" style="margin:10px 0;"></div>
