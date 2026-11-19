@@ -6,7 +6,7 @@ pydantic==2.9.2
 pydantic-settings==2.5.2
 bcrypt==4.0.1
 pyjwt==2.9.0
-edge-tts==7.3.1
+edge-tts>=7.0.0
 gTTS==2.5.4
 pyttsx3==2.98
 qrcode[pil]==7.4.2

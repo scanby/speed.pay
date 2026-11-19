@@ -65,6 +65,8 @@ jobs:
             "--hidden-import", "websockets",
             "--hidden-import", "engineio.async_drivers.asgi",
             "--hidden-import", "pyttsx3.drivers.sapi5",
+            "--hidden-import", "edge_tts",
+            "--hidden-import", "gtts",
             "--add-data", "VERSION;.",
             "--add-data", "..\client_win7\web_pos;client_win7\web_pos",
             "app/main.py"
@@ -188,7 +190,18 @@ jobs:
           KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           if [ -n "$KEYSTORE_B64" ] && [ -n "$KEYSTORE_PASS" ] && [ -n "$KEY_ALIAS_SECRET" ]; then
-            printf '%s' "$KEYSTORE_B64" | tr -d '\r\n ' | base64 --decode > release.keystore
+            python3 - <<'PY'
+import base64, os, re
+raw = os.environ["KEYSTORE_B64"]
+cleaned = re.sub(r"-----[A-Z0-9 ]+-----", "", raw)
+cleaned = re.sub(r"\s+", "", cleaned)
+missing_padding = len(cleaned) % 4
+if missing_padding:
+    cleaned += "=" * (4 - missing_padding)
+data = base64.b64decode(cleaned)
+with open("release.keystore", "wb") as f:
+    f.write(data)
+PY
             if [ ! -s release.keystore ]; then
               echo "Error: ANDROID_KEYSTORE_BASE64 decoded to an empty file."
               exit 1
