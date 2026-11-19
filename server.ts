@@ -27,6 +27,7 @@ function detectLanguage(filePath: string): string {
   if (filePath.endsWith(".css")) return "css";
   if (filePath.endsWith(".js")) return "javascript";
   if (filePath.endsWith(".md")) return "markdown";
+  if (filePath.endsWith(".yml") || filePath.endsWith(".yaml")) return "yaml";
   return "text";
 }
 
@@ -65,9 +66,21 @@ async function startServer() {
   const app = express();
   app.use(express.json());
 
-  // API: Lista completa de archivos fuente entregables
+  // API: Lista completa de archivos fuente entregables (incluye .github/workflows/release.yml)
   app.get("/api/deliverables", (_req, res) => {
     const files = collectDeliverables(DELIVERABLES_DIR);
+    const releaseWorkflowPath = path.resolve(__dirname, ".github", "workflows", "release.yml");
+    if (fs.existsSync(releaseWorkflowPath)) {
+      const wfContent = fs.readFileSync(releaseWorkflowPath, "utf-8");
+      files.push({
+        path: ".github/workflows/release.yml",
+        name: "release.yml",
+        module: "docs",
+        language: "yaml",
+        lines: wfContent.split("\n").length,
+        content: wfContent,
+      });
+    }
     res.json({
       totalFiles: files.length,
       files,

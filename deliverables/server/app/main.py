@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -54,8 +55,12 @@ fastapi_app.include_router(admin_routes.router)
 Path(settings.AUDIO_DIR).mkdir(parents=True, exist_ok=True)
 fastapi_app.mount("/static/audio", StaticFiles(directory=settings.AUDIO_DIR), name="audio")
 
-# Sirve el Frontend Web POS compatible con Windows 7 (ES5/ES6)
-CLIENT_WEB_DIR = Path(__file__).resolve().parent.parent.parent / "client_win7" / "web_pos"
+# Sirve el Frontend Web POS compatible con Windows 7 (ES5/ES6), tanto en dev como dentro de PyInstaller .exe
+if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+    CLIENT_WEB_DIR = Path(sys._MEIPASS) / "client_win7" / "web_pos"
+else:
+    CLIENT_WEB_DIR = Path(__file__).resolve().parent.parent.parent / "client_win7" / "web_pos"
+
 if CLIENT_WEB_DIR.exists():
     fastapi_app.mount("/pos", StaticFiles(directory=str(CLIENT_WEB_DIR), html=True), name="pos_web")
 
@@ -83,7 +88,7 @@ app = socketio.ASGIApp(socket_manager.sio, other_asgi_app=fastapi_app)
 
 if __name__ == "__main__":
     uvicorn.run(
-        "app.main:app",
+        app,
         host=settings.SERVER_HOST,
         port=settings.SERVER_PORT,
         log_level="info",

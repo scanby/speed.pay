@@ -1,22 +1,39 @@
 from __future__ import annotations
 
 import logging
+import os
 import socket
+import sys
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+def get_runtime_base_dir() -> Path:
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return Path(__file__).resolve().parent.parent.parent
+
+
+RUNTIME_DIR = get_runtime_base_dir()
+if getattr(sys, "frozen", False):
+    os.chdir(str(RUNTIME_DIR))
+
+
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=str(RUNTIME_DIR / ".env"),
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
     APP_NAME: str = "NequiPay POS Server"
     SERVER_HOST: str = "0.0.0.0"
     SERVER_PORT: int = 8000
-    DATABASE_URL: str = "sqlite:///./data/nequipos.db"
-    LOG_DIR: str = "./logs"
-    AUDIO_DIR: str = "./static/audio"
+    DATABASE_URL: str = f"sqlite:///{(RUNTIME_DIR / 'data' / 'nequipos.db').as_posix()}"
+    LOG_DIR: str = str(RUNTIME_DIR / "logs")
+    AUDIO_DIR: str = str(RUNTIME_DIR / "static" / "audio")
     JWT_SECRET_KEY: str = "nequipos-dev-secret-change-in-production-64-bytes-minimum"
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRE_MINUTES: int = 720

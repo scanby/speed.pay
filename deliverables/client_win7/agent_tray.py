@@ -1,17 +1,17 @@
 # -*- coding: utf-8 -*-
 """
 Agente Nativo POS para Windows 7 / 10 / 11 (Python 3.8 compatible).
+- Incluye Panel de Configuración local (Tkinter) para definir la IP estática del PC Servidor,
+  puerto, nombre de caja y volumen sin recompilar ni editar accesos directos.
 - Mantiene conexión Socket.IO persistente en segundo plano con reconexión exponencial.
 - Descarga el audio WAV/MP3 generado por el servidor y lo reproduce con pygame.mixer,
   evitando cualquier bloqueo de autoplay del navegador en cajas registradoras.
 - Muestra icono en bandeja del sistema (Verde: Conectado / Rojo: Desconectado).
-- Permite abrir el monitor web en modo kiosco/ventana limpia.
 """
 import argparse
 import logging
 import os
 import subprocess
-import sys
 import tempfile
 import threading
 import time
@@ -23,6 +23,14 @@ import pystray
 import requests
 import socketio
 from PIL import Image, ImageDraw
+
+from client_config import (
+    build_server_url,
+    config_exists,
+    load_client_config,
+    save_client_config,
+)
+from config_window import open_config_dialog
 
 LOG_DIR = os.path.join(os.path.expanduser("~"), ".nequipos_client", "logs")
 os.makedirs(LOG_DIR, exist_ok=True)
@@ -47,10 +55,12 @@ def create_status_icon(color_hex):
 
 
 class PosTrayAgent(object):
-    def __init__(self, server_url):
-        self.server_url = server_url.rstrip("/")
+    def __init__(self, initial_config):
+        self.config = initial_config
+        self.server_url = build_server_url(initial_config)
         self.running = True
         self.connected = False
+        self.reconnect_requested = False
         self.audio_lock = threading.Lock()
         self.tray_icon = None
 
@@ -97,8 +107,9 @@ class PosTrayAgent(object):
         if self.tray_icon is not None:
             color = "#16A34A" if self.connected else "#DC2626"
             status_text = "En línea" if self.connected else "Desconectado"
+            label = self.config.get("pos_label", "Caja POS")
             self.tray_icon.icon = create_status_icon(color)
-            self.tray_icon.title = "NequiPay POS ({0})".format(status_text)
+            self.tray_icon.title = "NequiPay POS · {0} ({1})".format(label, status_text)
 
     def _download_and_play(self, full_audio_url):
         with self.audio_lock:
@@ -111,8 +122,9 @@ class PosTrayAgent(object):
                 with os.fdopen(fd, "wb") as f:
                     f.write(resp.content)
 
+                volume = max(0.0, min(1.0, float(self.config.get("audio_volume", 100)) / 100.0))
                 pygame.mixer.music.load(tmp_path)
-                pygame.mixer.music.set_volume(1.0)
+                pygame.mixer.music.set_volume(volume)
                 pygame.mixer.music.play()
                 while pygame.mixer.music.get_busy():
                     time.sleep(0.1)
@@ -128,6 +140,10 @@ class PosTrayAgent(object):
 
     def open_pos_kiosk(self, _icon=None, _item=None):
         target = self.server_url + "/pos/"
+        if not self.config.get("kiosk_mode", True):
+            webbrowser.open(target)
+            return
+
         chrome_paths = [
             r"C:\Program Files\Google\Chrome\Application\chrome.exe",
             r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
@@ -139,19 +155,51 @@ class PosTrayAgent(object):
                 return
         webbrowser.open(target)
 
+    def open_configuration_panel(self, _icon=None, _item=None):
+        def _run_ui():
+            def on_saved(new_cfg):
+                self.config = new_cfg
+                new_url = build_server_url(new_cfg)
+                if new_url != self.server_url:
+                    self.server_url = new_url
+                    self.reconnect_requested = True
+                    try:
+                        if self.sio.connected:
+                            self.sio.disconnect()
+                    except Exception:
+                        pass
+                self._update_tray_visual()
+                logger.info("Configuración actualizada en vivo -> %s", self.server_url)
+
+            open_config_dialog(on_save_callback=on_saved)
+
+        threading.Thread(target=_run_ui, daemon=True).start()
+
     def _socket_loop(self):
         backoff = 1
         while self.running:
+            if self.reconnect_requested:
+                self.reconnect_requested = False
+                backoff = 1
+
             if not self.sio.connected:
                 try:
                     self.sio.connect(
                         self.server_url,
-                        auth={"agent": "win7_python_tray"},
+                        auth={
+                            "agent": "win7_python_tray",
+                            "pos_label": self.config.get("pos_label", "Caja"),
+                        },
                         transports=["websocket", "polling"],
                     )
                     backoff = 1
                 except Exception as exc:
-                    logger.warning("Fallo conexión Socket.IO (%s). Reintento en %ds", exc, backoff)
+                    logger.warning(
+                        "Fallo conexión Socket.IO a %s (%s). Reintento en %ds",
+                        self.server_url,
+                        exc,
+                        backoff,
+                    )
                     time.sleep(backoff)
                     backoff = min(backoff * 2, 30)
                     continue
@@ -177,6 +225,7 @@ class PosTrayAgent(object):
 
         menu = pystray.Menu(
             pystray.MenuItem("Abrir Monitor POS", self.open_pos_kiosk, default=True),
+            pystray.MenuItem("Configurar Servidor (IP / Puerto)", self.open_configuration_panel),
             pystray.MenuItem("Salir", self.stop),
         )
         self.tray_icon = pystray.Icon(
@@ -185,13 +234,28 @@ class PosTrayAgent(object):
             "NequiPay POS (Conectando...)",
             menu,
         )
-        self.open_pos_kiosk()
+        if self.config.get("auto_open_browser", True):
+            self.open_pos_kiosk()
         self.tray_icon.run()
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Agente POS NequiPay para Windows 7/10/11")
-    parser.add_argument("--server", default="http://192.168.1.50:8000", help="URL del Servidor Central")
+    parser.add_argument("--server-ip", default=None, help="IP estática del Servidor Central")
+    parser.add_argument("--port", type=int, default=None, help="Puerto del Servidor Central")
+    parser.add_argument("--configure", action="store_true", help="Abrir panel de configuración al iniciar")
     args = parser.parse_args()
-    agent = PosTrayAgent(server_url=args.server)
+
+    if args.configure or not config_exists():
+        open_config_dialog()
+
+    cfg = load_client_config()
+    if args.server_ip or args.port:
+        if args.server_ip:
+            cfg["server_ip"] = args.server_ip
+        if args.port:
+            cfg["server_port"] = args.port
+        cfg = save_client_config(cfg)
+
+    agent = PosTrayAgent(initial_config=cfg)
     agent.run()
