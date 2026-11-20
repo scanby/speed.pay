@@ -4,7 +4,7 @@ import csv
 import io
 import json
 import os
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import List, Optional
 
@@ -80,6 +80,21 @@ def _to_user_out(user: User) -> UserOut:
     )
 
 
+def _as_utc(dt: datetime) -> datetime:
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def _to_naive_utc(dt: datetime) -> datetime:
+    return _as_utc(dt).replace(tzinfo=None)
+
+
+def _to_local_str(dt: datetime) -> str:
+    local_tz = datetime.now().astimezone().tzinfo
+    return _as_utc(dt).astimezone(local_tz).strftime("%Y-%m-%d %H:%M:%S")
+
+
 def _to_deposit_out(tx: DepositTransaction) -> DepositOut:
     audio_url = f"/static/audio/{tx.audio_filename}" if tx.audio_filename else None
     return DepositOut(
@@ -93,8 +108,8 @@ def _to_deposit_out(tx: DepositTransaction) -> DepositOut:
         tts_phrase=f"Pago por el valor de {tx.amount_words}",
         audio_url=audio_url,
         source=tx.source,
-        captured_at=tx.captured_at,
-        received_at=tx.received_at,
+        captured_at=_as_utc(tx.captured_at),
+        received_at=_as_utc(tx.received_at),
     )
 
 
@@ -224,7 +239,7 @@ class DepositUseCases:
                 raw_notification=payload.raw_notification,
                 source=payload.source,
                 audio_filename=audio_filename,
-                captured_at=payload.captured_at,
+                captured_at=_to_naive_utc(payload.captured_at),
                 received_at=datetime.utcnow(),
             )
         )
@@ -286,8 +301,8 @@ class DepositUseCases:
         for tx in rows:
             writer.writerow([
                 tx.id,
-                tx.captured_at.isoformat(),
-                tx.received_at.isoformat(),
+                _to_local_str(tx.captured_at),
+                _to_local_str(tx.received_at),
                 tx.account_alias,
                 tx.sender_name,
                 f"{tx.amount_cop:.2f}",

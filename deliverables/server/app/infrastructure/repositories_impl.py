@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import secrets
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
 from typing import List, Optional, Tuple
 
@@ -188,9 +188,18 @@ class SqlAlchemyTransactionRepository(ITransactionRepository):
         self._db.refresh(row)
         return self._to_entity(row)
 
+    @staticmethod
+    def _local_range_to_utc(start_date: date, end_date: date) -> Tuple[datetime, datetime]:
+        local_tz = datetime.now().astimezone().tzinfo or timezone(timedelta(hours=-5))
+        start_local = datetime.combine(start_date, time.min, tzinfo=local_tz)
+        end_local = datetime.combine(end_date, time.max, tzinfo=local_tz)
+        return (
+            start_local.astimezone(timezone.utc).replace(tzinfo=None),
+            end_local.astimezone(timezone.utc).replace(tzinfo=None),
+        )
+
     def list_for_date(self, target_date: date) -> List[DepositTransaction]:
-        start_dt = datetime.combine(target_date, time.min)
-        end_dt = datetime.combine(target_date, time.max)
+        start_dt, end_dt = self._local_range_to_utc(target_date, target_date)
         rows = (
             self._db.query(DepositTransactionModel)
             .filter(
@@ -208,8 +217,7 @@ class SqlAlchemyTransactionRepository(ITransactionRepository):
         end_date: date,
         account_id: Optional[int] = None,
     ) -> List[DepositTransaction]:
-        start_dt = datetime.combine(start_date, time.min)
-        end_dt = datetime.combine(end_date, time.max)
+        start_dt, end_dt = self._local_range_to_utc(start_date, end_date)
         query = self._db.query(DepositTransactionModel).filter(
             DepositTransactionModel.captured_at >= start_dt,
             DepositTransactionModel.captured_at <= end_dt,
@@ -220,8 +228,7 @@ class SqlAlchemyTransactionRepository(ITransactionRepository):
         return [self._to_entity(r) for r in rows]
 
     def get_daily_summary(self, target_date: date) -> Tuple[int, str]:
-        start_dt = datetime.combine(target_date, time.min)
-        end_dt = datetime.combine(target_date, time.max)
+        start_dt, end_dt = self._local_range_to_utc(target_date, target_date)
         count, total = (
             self._db.query(
                 func.count(DepositTransactionModel.id),

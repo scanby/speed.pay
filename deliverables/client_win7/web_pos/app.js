@@ -21,6 +21,49 @@
     return "$" + num.toLocaleString("es-CO", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
   }
 
+  function parseUtcDate(isoStr) {
+    if (!isoStr) return null;
+    var s = String(isoStr).trim();
+    if (!/(Z|[+-]\d{2}:?\d{2})$/i.test(s)) {
+      s = s + "Z";
+    }
+    var d = new Date(s);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  function formatLocalTime(isoStr) {
+    var d = parseUtcDate(isoStr);
+    if (!d) return String(isoStr || "").slice(11, 19);
+    try {
+      return d.toLocaleTimeString("es-CO", {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: true
+      });
+    } catch (e) {
+      return d.toTimeString().slice(0, 8);
+    }
+  }
+
+  function formatLocalDateTime(isoStr) {
+    var d = parseUtcDate(isoStr);
+    if (!d) return String(isoStr || "");
+    try {
+      return d.toLocaleString("es-CO", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: true
+      });
+    } catch (e) {
+      return d.toLocaleString();
+    }
+  }
+
   function apiRequest(method, url, body, callback) {
     var xhr = new XMLHttpRequest();
     xhr.open(method, url, true);
@@ -215,7 +258,7 @@
       for (var i = 0; i < data.items.length; i++) {
         var item = data.items[i];
         var tr = document.createElement("tr");
-        var timeStr = item.captured_at.slice(11, 19);
+        var timeStr = formatLocalTime(item.captured_at);
         tr.innerHTML =
           "<td>" + timeStr + "</td>" +
           "<td>" + item.account_alias + "</td>" +
@@ -551,7 +594,7 @@
       for (var i = 0; i < rows.length; i++) {
         var tr = document.createElement("tr");
         tr.innerHTML =
-          "<td>" + rows[i].captured_at + "</td>" +
+          "<td>" + formatLocalDateTime(rows[i].captured_at) + "</td>" +
           "<td>" + rows[i].account_alias + "</td>" +
           "<td>" + rows[i].sender_name + "</td>" +
           "<td><code>" + rows[i].idempotency_hash.slice(0, 12) + "</code></td>" +
